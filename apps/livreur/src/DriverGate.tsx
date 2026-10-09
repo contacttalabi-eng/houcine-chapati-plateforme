@@ -75,29 +75,30 @@ const RESEND_SECONDS = 60;
 function Cover({ onStart }: { onStart: () => void }) {
   useStatusBarColor(NEON);
   return (
-    <main className="min-h-dvh bg-[var(--neon)] text-[var(--neon-ink)]">
-      <div className="relative mx-auto flex min-h-dvh max-w-md flex-col overflow-hidden">
-        <div className="relative z-10 px-6 pt-[max(1.25rem,env(safe-area-inset-top))]">
-          <CubeIcon className="size-11" />
-          <LogoCutout className="mx-auto -mt-5 h-[9.5rem] drop-shadow-[0_8px_12px_rgb(0_0_0/0.15)]" />
-          <h1 className="mt-5 text-[2.85rem] font-extrabold leading-[1.02] tracking-[-0.045em]">
+    <main className="h-dvh overflow-hidden bg-[var(--neon)] text-[var(--neon-ink)]">
+      {/* Tout tient sur un seul écran : tailles calées sur la hauteur, l'illustration prend le reste */}
+      <div className="relative mx-auto flex h-full max-w-md flex-col">
+        <div className="relative z-10 shrink-0 px-6 pt-[max(1.25rem,env(safe-area-inset-top))]">
+          <CubeIcon className="size-[clamp(2rem,5dvh,2.75rem)]" />
+          <LogoCutout className="mx-auto -mt-5 h-[clamp(5rem,18dvh,9.5rem)] drop-shadow-[0_8px_12px_rgb(0_0_0/0.15)]" />
+          <h1 className="mt-[clamp(0.5rem,2dvh,1.25rem)] text-[clamp(1.9rem,5.6dvh,2.85rem)] font-extrabold leading-[1.02] tracking-[-0.045em]">
             Livré.<br />À l'heure.
           </h1>
-          <div className="relative mt-3 pr-16">
-            <p className="text-[1.05rem] font-medium leading-snug text-black/85">
+          <div className="relative mt-[clamp(0.25rem,1.4dvh,0.75rem)] pr-16">
+            <p className="text-[clamp(0.85rem,2.1dvh,1.05rem)] font-medium leading-snug text-black/85">
               Suivi en temps réel et itinéraire optimisé pour chaque commande.
             </p>
-            <PinIcon className="absolute -top-9 right-1 h-[4.5rem] w-14" />
+            <PinIcon className="absolute -top-9 right-1 h-[clamp(3rem,8.5dvh,4.5rem)] w-auto" />
           </div>
         </div>
 
-        <div className="relative -mt-2 min-h-[19rem] flex-1">
+        <div className="relative -mt-2 min-h-0 flex-1">
           <img src="/brand/livreur-route.webp" alt="" aria-hidden width={928} height={932}
-            className="absolute inset-0 size-full object-cover object-top [mask-image:linear-gradient(to_bottom,transparent,#000_12%)]" />
+            className="absolute inset-0 size-full object-cover object-[50%_35%] [mask-image:linear-gradient(to_bottom,transparent,#000_12%)]" />
         </div>
 
         <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-          <Pill onClick={onStart} className="h-16 text-xl" icon={<ArrowRight className="size-6" />}>Commencer</Pill>
+          <Pill onClick={onStart} className="h-[clamp(3.25rem,7.5dvh,4rem)] text-xl" icon={<ArrowRight className="size-6" />}>Commencer</Pill>
         </div>
       </div>
     </main>
