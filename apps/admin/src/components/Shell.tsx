@@ -34,8 +34,10 @@ function SoundButton() {
 
 export function Shell({ email, children }: { email: string; children: ReactNode }) {
   const path = usePath();
-  const { live, orders } = useAdmin();
+  const { live, orders, driverApplications } = useAdmin();
   const pending = orders.filter((o) => o.status === "PENDING").length;
+  const pendingDrivers = driverApplications.filter((a) => a.status === "PENDING").length;
+  const badge = (to: string) => (to === "/commandes" ? pending : to === "/livreurs" ? pendingDrivers : 0);
   const isActive = (to: string) => (to === "/" ? path === "/" : path.startsWith(to));
 
   return (
@@ -55,8 +57,8 @@ export function Shell({ email, children }: { email: string; children: ReactNode 
                 isActive(to) ? "bg-brand text-white shadow-md shadow-brand/25" : "text-fg-muted hover:bg-surface-2 hover:text-fg")}>
               <Icon className="size-5" />
               <span className="flex-1">{label}</span>
-              {to === "/commandes" && pending > 0 && (
-                <span className={cx("rounded-full px-2 text-xs font-extrabold", isActive(to) ? "bg-white text-brand" : "bg-brand text-white")}>{pending}</span>
+              {badge(to) > 0 && (
+                <span className={cx("rounded-full px-2 text-xs font-extrabold", isActive(to) ? "bg-white text-brand" : "bg-brand text-white")}>{badge(to)}</span>
               )}
             </Link>
           ))}
@@ -91,8 +93,8 @@ export function Shell({ email, children }: { email: string; children: ReactNode 
             className={cx("relative flex flex-col items-center gap-0.5 pt-2 text-[11px] font-bold", isActive(to) ? "text-brand" : "text-fg-muted")}>
             <Icon className="size-5" />
             {label.split(" ")[0]}
-            {to === "/commandes" && pending > 0 && (
-              <span className="absolute right-[22%] top-1 grid min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] text-white">{pending}</span>
+            {badge(to) > 0 && (
+              <span className="absolute right-[22%] top-1 grid min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] text-white">{badge(to)}</span>
             )}
           </Link>
         ))}

@@ -1,13 +1,14 @@
 import {
-  algiersDayStart, errorMessage, fetchBoardOrders, fetchDashboardStats, fetchDrivers, fetchOrderWithItems,
-  fetchSettings, useNotificationFeed, useRealtime, useResyncOnFocus,
-  type DashboardStats, type Driver, type OrderWithItems, type RestaurantSettings,
+  algiersDayStart, errorMessage, fetchBoardOrders, fetchDashboardStats, fetchDriverApplications, fetchDrivers,
+  fetchOrderWithItems, fetchSettings, useNotificationFeed, useRealtime, useResyncOnFocus,
+  type DashboardStats, type Driver, type DriverApplication, type OrderWithItems, type RestaurantSettings,
 } from "@hc/shared";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 interface AdminData {
   orders: OrderWithItems[];
   drivers: Driver[];
+  driverApplications: DriverApplication[];
   settings: RestaurantSettings | null;
   stats: DashboardStats | null;
   live: boolean;
@@ -15,6 +16,7 @@ interface AdminData {
   error: string | null;
   refresh: () => Promise<void>;
   refreshDrivers: () => Promise<void>;
+  refreshApplications: () => Promise<void>;
   setSettings: (s: RestaurantSettings) => void;
   /** id de la dernière commande arrivée (mise en évidence) */
   freshOrderId: string | null;
@@ -33,6 +35,7 @@ const byCreatedDesc = (a: OrderWithItems, b: OrderWithItems) => b.created_at.loc
 export function AdminDataProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driverApplications, setDriverApplications] = useState<DriverApplication[]>([]);
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,11 +54,18 @@ export function AdminDataProvider({ userId, children }: { userId: string; childr
     setDrivers(await fetchDrivers());
   }, []);
 
+  const refreshApplications = useCallback(async () => {
+    setDriverApplications(await fetchDriverApplications());
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
-      const [o, d, s] = await Promise.all([fetchBoardOrders(algiersDayStart()), fetchDrivers(), fetchSettings()]);
+      const [o, d, a, s] = await Promise.all([
+        fetchBoardOrders(algiersDayStart()), fetchDrivers(), fetchDriverApplications(), fetchSettings(),
+      ]);
       setOrders(o);
       setDrivers(d);
+      setDriverApplications(a);
       setSettings(s);
       setError(null);
       loadStats();
@@ -81,7 +91,7 @@ export function AdminDataProvider({ userId, children }: { userId: string; childr
 
   const live = useRealtime(
     "admin",
-    [{ table: "orders" }, { table: "drivers" }, { table: "restaurant_settings" }],
+    [{ table: "orders" }, { table: "drivers" }, { table: "driver_applications" }, { table: "restaurant_settings" }],
     (payload) => {
       if (payload.table === "orders") {
         const row = (payload.eventType === "DELETE" ? payload.old : payload.new) as { id?: string };
@@ -99,6 +109,8 @@ export function AdminDataProvider({ userId, children }: { userId: string; childr
         } else {
           void refreshDrivers();
         }
+      } else if (payload.table === "driver_applications") {
+        void refreshApplications();
       } else if (payload.table === "restaurant_settings" && payload.eventType === "UPDATE") {
         setSettings(payload.new as unknown as RestaurantSettings);
       }
@@ -111,8 +123,12 @@ export function AdminDataProvider({ userId, children }: { userId: string; childr
   useNotificationFeed(userId, undefined, { chime: 2 });
 
   const value = useMemo<AdminData>(() => ({
-    orders, drivers, settings, stats, live, loading, error, refresh, refreshDrivers, setSettings, freshOrderId,
-  }), [orders, drivers, settings, stats, live, loading, error, refresh, refreshDrivers, freshOrderId]);
+    orders, drivers, driverApplications, settings, stats, live, loading, error, refresh, refreshDrivers,
+    refreshApplications, setSettings, freshOrderId,
+  }), [
+    orders, drivers, driverApplications, settings, stats, live, loading, error, refresh, refreshDrivers,
+    refreshApplications, freshOrderId,
+  ]);
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
 }

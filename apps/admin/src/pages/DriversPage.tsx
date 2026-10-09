@@ -1,11 +1,11 @@
 import {
   Button, ButtonLink, Card, ConfirmSheet, DriverStatusBadge, EmptyState, Field, Input, Sheet, StatusBadge, Switch,
-  createDriverAccount, cx, decideDriverApplication, errorMessage, fetchDriverApplications, formatPhone, formatTime,
-  normalizeDzPhone, setDriverPassword, telHref, timeAgo, toast, updateDriver, useRealtime,
+  createDriverAccount, cx, decideDriverApplication, errorMessage, formatPhone, formatTime,
+  normalizeDzPhone, setDriverPassword, telHref, timeAgo, toast, updateDriver,
   type Driver, type DriverApplication, type DriverStatus,
 } from "@hc/shared";
 import { Bike, Check, KeyRound, Pencil, Phone, Plus, ShieldCheck, UserPlus, X } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { PageTitle } from "../components/Shell";
 import { useAdmin } from "../state/admin";
 
@@ -116,19 +116,12 @@ const FILTERS: { key: "ALL" | DriverStatus; label: string }[] = [
 ];
 
 /**
- * Demandes d'inscription des livreurs (compte Google + prénom/nom/téléphone),
- * en direct. Approuver crée le compte livreur ; refuser le laisse client.
+ * Demandes d'inscription des livreurs (code reçu par email + prénom/nom/téléphone),
+ * en direct (voir useAdmin). Approuver crée le compte livreur ; refuser le laisse client.
  */
-function DriverApplications() {
-  const [applications, setApplications] = useState<DriverApplication[]>([]);
+function DriverApplications({ applications, refresh }: { applications: DriverApplication[]; refresh: () => Promise<void> }) {
   const [confirm, setConfirm] = useState<{ app: DriverApplication; approve: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(() => {
-    fetchDriverApplications().then(setApplications, (e: unknown) => toast.error(errorMessage(e)));
-  }, []);
-  useEffect(load, [load]);
-  useRealtime("admin-driver-applications", [{ table: "driver_applications" }], load, load);
 
   const pending = applications.filter((a) => a.status === "PENDING");
   if (pending.length === 0) return null;
@@ -142,7 +135,7 @@ function DriverApplications() {
         ? `${confirm.app.first_name} ${confirm.app.last_name} est maintenant livreur`
         : "Demande refusée");
       setConfirm(null);
-      load();
+      await refresh();
     } catch (e) {
       toast.error(errorMessage(e));
     } finally {
@@ -185,7 +178,7 @@ function DriverApplications() {
 }
 
 export function DriversPage() {
-  const { drivers, orders } = useAdmin();
+  const { drivers, orders, driverApplications, refreshApplications } = useAdmin();
   const [filter, setFilter] = useState<"ALL" | DriverStatus>("ALL");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Driver | null>(null);
@@ -200,7 +193,7 @@ export function DriversPage() {
       <PageTitle title="Livreurs" subtitle={`${count("AVAILABLE")} disponible(s) · ${count("BUSY")} occupé(s) · ${count("OFFLINE")} hors ligne`}
         actions={<Button icon={<Plus className="size-4" />} onClick={() => setAdding(true)}>Ajouter un livreur</Button>} />
 
-      <DriverApplications />
+      <DriverApplications applications={driverApplications} refresh={refreshApplications} />
 
       <div className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
