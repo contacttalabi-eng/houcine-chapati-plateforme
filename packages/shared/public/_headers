@@ -1,0 +1,7 @@
+# En-têtes de sécurité appliqués par Cloudflare Pages aux 3 applications
+# (ce fichier est copié dans chaque build, il n'est pas servi comme page).
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=()
