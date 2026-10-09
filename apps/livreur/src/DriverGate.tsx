@@ -4,7 +4,9 @@ import {
   useSession, verifyEmailCode, type DriverApplication, type Profile,
 } from "@hc/shared";
 import type { Session } from "@supabase/supabase-js";
-import { Clock, KeyRound, LogOut, Mail, MailCheck, ShieldAlert, ShieldCheck, UserRound, XCircle } from "lucide-react";
+import {
+  ArrowRight, Clock, KeyRound, LogOut, Mail, MailCheck, Package, ShieldAlert, ShieldCheck, UserRound, XCircle,
+} from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 function Screen({ children }: { children: ReactNode }) {
@@ -218,31 +220,54 @@ function DriverWelcome() {
   if (mode === "code") return <CodeStep email={email.trim().toLowerCase()} onBack={() => setMode("email")} />;
   if (mode === "password") return <PasswordLogin onBack={() => setMode("email")} />;
 
+  const valid = /^\S+@\S+\.\S+$/.test(email.trim());
+
   return (
-    <Screen>
-      <Brand subtitle="Houcine Chapati — livraisons" />
-      <form onSubmit={send} className="flex flex-col gap-4" noValidate>
-        <Field label="Votre email" hint="Vous recevrez un code à 6 chiffres pour vous connecter ou vous inscrire.">
-          {(p) => (
-            <div className="relative">
-              <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
-              <Input {...p} type="email" autoComplete="email" inputMode="email" required value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null); }} className="pl-10" placeholder="vous@exemple.com" />
-            </div>
-          )}
-        </Field>
-        {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500" role="alert">{error}</p>}
-        <Button type="submit" size="lg" full loading={sending} disabled={!/^\S+@\S+\.\S+$/.test(email.trim())}>
-          Recevoir mon code
-        </Button>
+    <main className="relative min-h-dvh overflow-hidden bg-[var(--neon)] px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-[var(--neon-ink)]">
+      {/* Halo décoratif, dans l'esprit de la maquette (route / point de livraison) */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 opacity-[0.07]" aria-hidden>
+        <svg viewBox="0 0 400 200" className="h-full w-full" fill="none">
+          <path d="M-20 180 C 100 180, 140 60, 260 60 S 420 20, 440 -10" stroke="black" strokeWidth="10" strokeDasharray="2 18" strokeLinecap="round" />
+        </svg>
+      </div>
+
+      <div className="relative flex items-center justify-between">
+        <span className="grid size-11 place-items-center rounded-full bg-black text-[var(--neon)] shadow-lg shadow-black/20">
+          <Package className="size-5" />
+        </span>
+      </div>
+
+      <div className="relative mt-7 flex flex-col items-center text-center">
+        <Logo size={92} className="ring-4 ring-black" />
+        <h1 className="mt-7 font-display text-5xl uppercase leading-[0.92] tracking-tight">Livré.<br />À l'heure.</h1>
+        <p className="mt-3 max-w-[22rem] text-sm font-bold text-black/70">
+          Suivi en direct et itinéraire malin pour chaque commande.
+        </p>
+      </div>
+
+      <form onSubmit={send} className="relative mt-10 flex flex-col gap-3" noValidate>
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-black/40" />
+          <input type="email" autoComplete="email" inputMode="email" required value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="vous@exemple.com"
+            className="h-14 w-full rounded-full border-2 border-black/10 bg-white pl-12 pr-4 text-base font-bold text-black placeholder:text-black/35 outline-none transition focus:border-black" />
+        </div>
+        {error && (
+          <p className="rounded-2xl bg-black px-4 py-2.5 text-center text-sm font-bold text-[var(--neon)]" role="alert">{error}</p>
+        )}
+        <button type="submit" disabled={!valid || sending}
+          className="flex h-14 items-center justify-center gap-2 rounded-full bg-black text-lg font-extrabold text-[var(--neon)] shadow-xl shadow-black/20 transition active:scale-[.98] disabled:opacity-40">
+          {sending ? "Envoi…" : <>Recevoir mon code <ArrowRight className="size-5" /></>}
+        </button>
       </form>
-      <p className="mt-3 text-center text-xs text-fg-muted">
+      <p className="relative mt-4 text-center text-xs font-bold text-black/60">
         Nouveau livreur ? Après le code, complétez votre fiche : le restaurant valide ensuite votre compte.
       </p>
-      <button type="button" onClick={() => setMode("password")} className="mt-5 w-full text-center text-sm font-bold text-fg-muted hover:text-fg">
+      <button type="button" onClick={() => setMode("password")}
+        className="relative mt-6 w-full text-center text-sm font-extrabold text-black/70 underline underline-offset-4 hover:text-black">
         Se connecter avec un mot de passe
       </button>
-    </Screen>
+    </main>
   );
 }
 

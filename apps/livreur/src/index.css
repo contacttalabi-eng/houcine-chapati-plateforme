@@ -77,3 +77,9 @@ body {
 [data-theme="light"] .text-amber {
   color: #b45309;
 }
+
+/* Couverture et tableau de bord : jaune fluo + noir (maquette fournie) */
+:root {
+  --neon: #e3fb3b;
+  --neon-ink: #121005;
+}

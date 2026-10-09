@@ -44,7 +44,7 @@ function OrderCard({ order }: { order: OrderWithItems }) {
   return (
     <Link to={`/commande/${order.id}`}
       className={cx("block rounded-3xl border-2 bg-surface p-5 transition active:scale-[.99] animate-fade-up",
-        urgent ? "border-flame shadow-lg shadow-flame/20" : "border-sky-500/50")}>
+        urgent ? "border-black shadow-lg shadow-black/10" : "border-sky-500/50")}>
       <div className="flex items-center justify-between gap-2">
         <StatusBadge status={order.status} className="text-sm" />
         <span className="font-mono text-sm font-bold text-fg-muted">{order.order_number}</span>
@@ -58,7 +58,7 @@ function OrderCard({ order }: { order: OrderWithItems }) {
         <span className="text-sm text-fg-muted">À encaisser</span>
         <span className="text-2xl font-extrabold text-gold">{formatDA(order.total)}</span>
       </div>
-      <div className="mt-4 flex h-14 items-center justify-center gap-2 rounded-2xl bg-fire text-lg font-extrabold text-white">
+      <div className="mt-4 flex h-14 items-center justify-center gap-2 rounded-2xl bg-black text-lg font-extrabold text-[var(--neon)]">
         <Navigation className="size-5" /> Ouvrir la commande <ChevronRight className="size-5" />
       </div>
     </Link>
@@ -114,25 +114,27 @@ export function OrdersPage({ ctx }: { ctx: DriverContext }) {
 
   return (
     <div className="mx-auto min-h-dvh max-w-xl px-4 pb-nav pt-[max(1rem,env(safe-area-inset-top))]">
-      <header className="mb-5 flex items-center gap-3">
-        <Link to="/compte" aria-label="Mon compte"
-          className="grid size-12 shrink-0 place-items-center rounded-full bg-fire text-lg font-extrabold text-white shadow-lg shadow-brand/30">
-          {initials(ctx.driver.name)}
-        </Link>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-fg-muted">Bonjour,</p>
-          <p className="truncate text-lg font-extrabold leading-tight">{firstName} 👋</p>
-          <LiveIndicator live={ctx.live} />
-        </div>
-        <Logo size={44} />
-      </header>
+      <div className="rounded-[2rem] bg-[var(--neon)] p-4 text-[var(--neon-ink)] shadow-sm sm:p-5">
+        <header className="flex items-center gap-3">
+          <Link to="/compte" aria-label="Mon compte"
+            className="grid size-12 shrink-0 place-items-center rounded-full bg-black text-lg font-extrabold text-[var(--neon)] shadow-lg shadow-black/20">
+            {initials(ctx.driver.name)}
+          </Link>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-bold text-black/60">Bonjour,</p>
+            <p className="truncate text-lg font-extrabold leading-tight">{firstName} 👋</p>
+            <LiveIndicator live={ctx.live} />
+          </div>
+          <Logo size={44} className="ring-4 ring-black" />
+        </header>
 
-      <div className="flex flex-col gap-3">
-        <AvailabilityToggle ctx={ctx} />
-        <AlertsPrompt />
-        {ctx.locationError && (
-          <p className="rounded-2xl bg-amber/15 p-3 text-sm font-semibold text-amber">📡 {ctx.locationError}</p>
-        )}
+        <div className="mt-4 flex flex-col gap-3">
+          <AvailabilityToggle ctx={ctx} />
+          <AlertsPrompt />
+          {ctx.locationError && (
+            <p className="rounded-2xl bg-black/10 p-3 text-sm font-bold text-black">📡 {ctx.locationError}</p>
+          )}
+        </div>
       </div>
 
       <h1 className="sr-only">Tableau de bord livreur</h1>
