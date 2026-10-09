@@ -161,7 +161,7 @@ function DriverApplications() {
             <p className="text-lg font-extrabold">{a.first_name} {a.last_name}</p>
             <p className="mt-1 text-sm">📞 {formatPhone(a.phone)}</p>
             <p className="flex items-center gap-1.5 truncate text-sm text-fg-muted">
-              <ShieldCheck className="size-4 shrink-0 text-emerald-500" aria-label="Email confirmé par Google" /> {a.email}
+              <ShieldCheck className="size-4 shrink-0 text-emerald-500" aria-label="Email confirmé" /> {a.email}
             </p>
             <p className="mt-1 text-xs text-fg-muted">Demande envoyée {timeAgo(a.created_at)}</p>
             <div className="mt-3 flex gap-2">

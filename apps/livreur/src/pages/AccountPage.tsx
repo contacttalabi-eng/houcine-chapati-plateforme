@@ -83,7 +83,7 @@ export function AccountPage({ ctx }: { ctx: DriverContext }) {
             <Row label="Nom">{driver.name}</Row>
             <Row label="Téléphone">{formatPhone(driver.phone)}</Row>
             <Row label="Email"><span className="inline-flex items-center gap-1"><Mail className="size-3.5 text-fg-muted" />{ctx.email ?? driver.email ?? "—"}</span></Row>
-            <Row label="Connexion">{ctx.provider === "google" ? "Google (identité confirmée)" : "Email et mot de passe"}</Row>
+            <Row label="Connexion">{ctx.provider === "otp" ? "Code reçu par email" : ctx.provider === "google" ? "Google (identité confirmée)" : "Email et mot de passe"}</Row>
           </dl>
           <p className="mt-2 text-xs text-fg-muted">Pour modifier votre nom ou votre téléphone, contactez le restaurant.</p>
         </Section>

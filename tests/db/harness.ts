@@ -29,21 +29,29 @@ export async function createDb(): Promise<Db> {
 /** Crée un compte Auth (le trigger crée le profil CUSTOMER). */
 export async function createUser(db: Db, email: string | null): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
-    "insert into auth.users (email, is_anonymous) values ($1, $2) returning id",
+    "insert into auth.users (email, is_anonymous, email_confirmed_at) values ($1, $2, case when $1::text is null then null else now() end) returning id",
     [email, email === null],
   );
   return rows[0]!.id;
 }
 
 /** Exécute fn avec les droits d'un utilisateur (JWT simulé), comme via l'API. */
+/**
+ * Mode de connexion simulé dans le jeton (claim « amr » de Supabase) :
+ * password = mot de passe, otp = code reçu par email, google = OAuth Google.
+ */
+export type SignInMethod = "password" | "otp" | "google" | "anonymous";
+
 export async function as<T>(
-  db: Db, userId: string | null, fn: (tx: Tx) => Promise<T>, provider: "email" | "google" | "anonymous" = "email",
+  db: Db, userId: string | null, fn: (tx: Tx) => Promise<T>, method: SignInMethod = "password",
 ): Promise<T> {
+  const provider = method === "google" ? "google" : method === "anonymous" ? "anonymous" : "email";
+  const amr = [{ method: method === "google" ? "oauth" : method, timestamp: Math.floor(Date.now() / 1000) }];
   return db.transaction(async (tx) => {
     await tx.exec(`set local role ${userId ? "authenticated" : "anon"}`);
     await tx.query("select set_config('request.jwt.claims', $1, true)", [
       JSON.stringify(userId
-        ? { sub: userId, role: "authenticated", is_anonymous: provider === "anonymous", app_metadata: { provider, providers: [provider] } }
+        ? { sub: userId, role: "authenticated", is_anonymous: method === "anonymous", app_metadata: { provider, providers: [provider] }, amr }
         : { role: "anon" }),
     ]);
     return fn(tx);

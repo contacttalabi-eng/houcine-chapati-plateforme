@@ -11,6 +11,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_LAST_NAME: "Indiquez votre nom de famille (2 caractères minimum).",
   INVALID_PHONE: "Numéro de téléphone invalide. Exemple : 0555 12 34 56.",
   GOOGLE_REQUIRED: "Connectez-vous avec votre compte Google pour vous inscrire comme livreur.",
+  EMAIL_NOT_VERIFIED: "Connectez-vous avec le code reçu par email pour vous inscrire comme livreur.",
   ALREADY_STAFF: "Ce compte est déjà un compte livreur ou administrateur.",
   ALREADY_DECIDED: "Cette demande a déjà été traitée.",
   NOT_FOUND: "Élément introuvable (il a peut-être été supprimé).",
@@ -68,6 +69,20 @@ export function errorMessage(error: unknown): string {
   if (known) return known.replace("{detail}", detail || "?");
 
   if (message === "Invalid login credentials") return "Email ou mot de passe incorrect.";
+  // Connexion par code reçu par email (Supabase Email OTP)
+  if (/token has expired or is invalid|otp_expired/i.test(message)) {
+    return "Code incorrect ou expiré. Vérifiez les 6 chiffres ou demandez un nouveau code.";
+  }
+  const wait = message.match(/only request this (?:after|once every) (\d+) seconds?/i);
+  if (wait) return `Patientez ${wait[1]} secondes avant de demander un nouveau code.`;
+  if (/email rate limit exceeded|over_email_send_rate_limit/i.test(message)) {
+    return "Trop de codes envoyés. Réessayez dans quelques minutes.";
+  }
+  if (/signups not allowed for otp/i.test(message)) return "Aucun compte avec cet email.";
+  if (/unable to validate email address|invalid format/i.test(message)) return "Adresse email invalide.";
+  if (/error sending (magic link|confirmation|otp)? ?email/i.test(message)) {
+    return "L'email n'a pas pu être envoyé. Réessayez plus tard ou contactez le restaurant.";
+  }
   if (message.includes("Email not confirmed")) return "Adresse email non confirmée.";
   if (/anonymous sign-ins are disabled/i.test(message)) {
     return "Les commandes sans compte ne sont pas activées (Supabase → Authentication → Anonymous sign-ins).";

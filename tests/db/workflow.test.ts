@@ -416,7 +416,7 @@ describe("profil client : téléphone et adresse de livraison", () => {
   });
 });
 
-describe("inscription des livreurs : demande Google + validation par l'administration", () => {
+describe("inscription des livreurs : email prouvé (code ou Google) + validation par l'administration", () => {
   let candidate: string;
   let other: string;
   let applicationId: string;
@@ -426,11 +426,15 @@ describe("inscription des livreurs : demande Google + validation par l'administr
     other = await createUser(db, "autre.candidat@gmail.com");
   });
 
-  it("refuse une demande sans compte Google vérifié (email, invité, anonyme)", async () => {
+  it("refuse une demande sans email prouvé (mot de passe, invité, visiteur, email non confirmé)", async () => {
     const call = "select * from driver_apply('Samir', 'Benali', '0550 11 22 33')";
-    expect(await errorOf(as(db, candidate, (tx) => tx.query(call), "email"))).toBe("GOOGLE_REQUIRED");
-    expect(await errorOf(as(db, candidate, (tx) => tx.query(call), "anonymous"))).toBe("GOOGLE_REQUIRED");
+    expect(await errorOf(as(db, candidate, (tx) => tx.query(call), "password"))).toBe("EMAIL_NOT_VERIFIED");
+    expect(await errorOf(as(db, candidate, (tx) => tx.query(call), "anonymous"))).toBe("EMAIL_NOT_VERIFIED");
     expect(await errorOf(as(db, null, (tx) => tx.query(call)))).toMatch(/permission denied/);
+    // jeton « code email » mais adresse jamais confirmée côté Auth : refusé aussi
+    const unconfirmed = await createUser(db, "pas.confirme@gmail.com");
+    await db.query("update auth.users set email_confirmed_at = null where id = $1", [unconfirmed]);
+    expect(await errorOf(as(db, unconfirmed, (tx) => tx.query(call), "otp"))).toBe("EMAIL_NOT_VERIFIED");
   });
 
   it("valide prénom, nom et téléphone", async () => {
@@ -457,7 +461,8 @@ describe("inscription des livreurs : demande Google + validation par l'administr
   });
 
   it("chacun ne voit que sa demande ; l'administrateur les voit toutes ; aucune écriture directe", async () => {
-    await as(db, other, (tx) => tx.query("select driver_apply('Nadia', 'Ait Ali', '0770998877')"), "google");
+    // connexion par code reçu par email (OTP)
+    await as(db, other, (tx) => tx.query("select driver_apply('Nadia', 'Ait Ali', '0770998877')"), "otp");
     const seenByCandidate = await as(db, candidate, async (tx) =>
       (await tx.query("select user_id from driver_applications")).rows.length, "google");
     expect(seenByCandidate).toBe(1);
@@ -496,7 +501,7 @@ describe("inscription des livreurs : demande Google + validation par l'administr
     const role = (await db.query<{ role: string }>("select role from profiles where user_id = $1", [other])).rows[0]!.role;
     expect(role).toBe("CUSTOMER");
     const again = await as(db, other, async (tx) =>
-      (await tx.query<{ status: string }>("select * from driver_apply('Nadia', 'Ait Ali', '0770998877')")).rows[0]!, "google");
+      (await tx.query<{ status: string }>("select * from driver_apply('Nadia', 'Ait Ali', '0770998877')")).rows[0]!, "otp");
     expect(again.status).toBe("PENDING");
   });
 });

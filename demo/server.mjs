@@ -9,6 +9,7 @@
 // Données en mémoire : tout est remis à zéro à chaque lancement.
 // ⚠ Outil de démonstration uniquement — la production utilise Supabase (README).
 // =============================================================================
+import { randomInt } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { createServer } from "node:http";
@@ -67,7 +68,7 @@ await db.exec(`
 // ----------------------------------------------------------------- comptes de démo
 const users = new Map(); // id → { id, email, is_anonymous, created_at, password, provider, userMetadata }
 async function createAuthUser(email, password, provider = email ? "email" : "anonymous", userMetadata = {}) {
-  const { rows } = await db.query("insert into auth.users (email, is_anonymous) values ($1, $2) returning id, created_at",
+  const { rows } = await db.query("insert into auth.users (email, is_anonymous, email_confirmed_at) values ($1, $2, case when $1::text is null then null else now() end) returning id, created_at",
     [email, !email]);
   const user = { id: rows[0].id, email, is_anonymous: !email, created_at: rows[0].created_at, password, provider, userMetadata };
   users.set(user.id, user);
@@ -95,14 +96,17 @@ const pkceCodes = new Map();
 
 // ----------------------------------------------------------------- jetons (démo : non signés)
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
-function tokenFor(user) {
+// method : password | otp | oauth | anonymous (claim « amr » des jetons Supabase)
+function tokenFor(user, method) {
   const exp = Math.floor(Date.now() / 1000) + 3600;
-  return `${b64({ alg: "none", typ: "JWT" })}.${b64({ sub: user.id, role: "authenticated", email: user.email, is_anonymous: user.is_anonymous, app_metadata: { provider: user.provider, providers: [user.provider] }, exp })}.demo`;
+  const amr = [{ method, timestamp: Math.floor(Date.now() / 1000) }];
+  return `${b64({ alg: "none", typ: "JWT" })}.${b64({ sub: user.id, role: "authenticated", email: user.email, is_anonymous: user.is_anonymous, app_metadata: { provider: user.provider, providers: [user.provider] }, amr, exp })}.demo`;
 }
 function userFromToken(token) {
   try {
     const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
-    return users.get(payload.sub) ?? null;
+    const user = users.get(payload.sub);
+    return user ? { ...user, amr: Array.isArray(payload.amr) ? payload.amr : [] } : null;
   } catch {
     return null;
   }
@@ -112,10 +116,13 @@ const authUserJson = (u) => ({
   is_anonymous: u.is_anonymous, app_metadata: { provider: u.provider, providers: [u.provider] },
   user_metadata: u.userMetadata ?? {}, identities: [], created_at: u.created_at, updated_at: u.created_at,
 });
-const session = (u) => ({
-  access_token: tokenFor(u), token_type: "bearer", expires_in: 3600,
-  expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: `rt_${u.id}`, user: authUserJson(u),
+const session = (u, method) => ({
+  access_token: tokenFor(u, method), token_type: "bearer", expires_in: 3600,
+  expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: `rt_${u.id}_${method}`, user: authUserJson(u),
 });
+
+// Codes à 6 chiffres envoyés « par email » (démo : affichés dans la console et lisibles via /demo/otp)
+const otpCodes = new Map(); // email → { code, expires }
 
 // Exécute fn avec les droits de l'utilisateur (RLS appliquée, comme via l'API Supabase)
 function asUser(user, fn) {
@@ -123,7 +130,7 @@ function asUser(user, fn) {
     await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
     await tx.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(
       user ? { sub: user.id, role: "authenticated", is_anonymous: user.is_anonymous,
-        app_metadata: { provider: user.provider, providers: [user.provider] } } : { role: "anon" })]);
+        app_metadata: { provider: user.provider, providers: [user.provider] }, amr: user.amr ?? [] } : { role: "anon" })]);
     return fn(tx);
   });
 }
@@ -407,12 +414,43 @@ async function handle(req, url, user) {
 
   // ---- Auth
   if (path === "/auth/v1/signup" && req.method === "POST") {
-    if (!body?.email) return { status: 200, json: session(await createAuthUser(null, null)) };
+    if (!body?.email) return { status: 200, json: session(await createAuthUser(null, null), "anonymous") };
     const email = String(body.email).trim().toLowerCase();
     if ([...users.values()].some((u) => u.email === email)) {
       return { status: 422, json: { code: "user_already_exists", error_code: "user_already_exists", msg: "User already registered" } };
     }
-    return { status: 200, json: session(await createAuthUser(email, String(body.password ?? ""))) };
+    return { status: 200, json: session(await createAuthUser(email, String(body.password ?? "")), "password") };
+  }
+  // Connexion par code reçu par email (Email OTP) : envoi du code…
+  if (path === "/auth/v1/otp" && req.method === "POST") {
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return { status: 400, json: { code: "validation_failed", error_code: "validation_failed", msg: "Unable to validate email address: invalid format" } };
+    }
+    const exists = [...users.values()].some((u) => u.email === email);
+    if (!exists && body?.create_user === false) {
+      return { status: 422, json: { code: "otp_disabled", error_code: "otp_disabled", msg: "Signups not allowed for otp" } };
+    }
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    otpCodes.set(email, { code, expires: Date.now() + 10 * 60_000 });
+    console.log(`[démo] code de connexion pour ${email} : ${code}`);
+    return { status: 200, json: {} };
+  }
+  // … puis vérification (crée le compte au premier code, email confirmé)
+  if (path === "/auth/v1/verify" && req.method === "POST") {
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const entry = otpCodes.get(email);
+    if (!entry || entry.expires < Date.now() || entry.code !== String(body?.token ?? "")) {
+      return { status: 403, json: { code: "otp_expired", error_code: "otp_expired", msg: "Token has expired or is invalid" } };
+    }
+    otpCodes.delete(email);
+    const u = [...users.values()].find((x) => x.email === email) ?? await createAuthUser(email, null, "email");
+    return { status: 200, json: session(u, "otp") };
+  }
+  // Démo uniquement : dernier code envoyé à une adresse (aucun vrai email n'est envoyé)
+  if (path === "/demo/otp" && req.method === "GET") {
+    const entry = otpCodes.get(String(url.searchParams.get("email") ?? "").trim().toLowerCase());
+    return { status: 200, json: { code: entry && entry.expires > Date.now() ? entry.code : null } };
   }
   // Connexion Google (simulée) : le navigateur est redirigé ici en navigation
   // complète par signInWithOAuth, comme vers le vrai /authorize de Supabase.
@@ -428,22 +466,23 @@ async function handle(req, url, user) {
   if (path === "/auth/v1/token" && req.method === "POST") {
     const grant = url.searchParams.get("grant_type");
     if (grant === "refresh_token") {
-      const u = users.get(String(body?.refresh_token ?? "").replace(/^rt_/, ""));
+      const [, id, method = "password"] = String(body?.refresh_token ?? "").match(/^rt_([^_]+)_?(\w*)$/) ?? [];
+      const u = id ? users.get(id) : undefined;
       if (!u) return { status: 400, json: { error: "invalid_grant", error_description: "Invalid Refresh Token", msg: "Invalid Refresh Token" } };
-      return { status: 200, json: session(u) };
+      return { status: 200, json: session(u, method || "password") };
     }
     if (grant === "pkce") {
       const userId = pkceCodes.get(String(body?.auth_code ?? ""));
       pkceCodes.delete(String(body?.auth_code ?? ""));
       const u = userId && users.get(userId);
       if (!u) return { status: 400, json: { error: "invalid_grant", error_description: "invalid flow state, no valid flow state found", msg: "invalid flow state, no valid flow state found" } };
-      return { status: 200, json: session(u) };
+      return { status: 200, json: session(u, "oauth") };
     }
     const u = [...users.values()].find((x) => x.email && x.email === String(body?.email ?? "").toLowerCase());
     if (!u || u.password == null || u.password !== body?.password) {
       return { status: 400, json: { code: "invalid_credentials", error: "invalid_grant", error_description: "Invalid login credentials", msg: "Invalid login credentials" } };
     }
-    return { status: 200, json: session(u) };
+    return { status: 200, json: session(u, "password") };
   }
   if (path === "/auth/v1/user") {
     return user ? { status: 200, json: authUserJson(user) } : { status: 401, json: { msg: "Invalid JWT", code: "bad_jwt" } };

@@ -1,23 +1,11 @@
 import {
-  Button, Card, EmptyState, Field, FullScreenLoader, Input, Logo, applyAsDriver, errorMessage, fetchMyDriverApplication,
-  formatPhone, isDemoMode, signInWithGoogle, signInWithPassword, signOut, toast, useProfile, useRealtime, useSession,
-  type DriverApplication, type Profile,
+  Button, Card, EmptyState, Field, FullScreenLoader, Input, Logo, applyAsDriver, env, errorMessage, fetchMyDriverApplication,
+  formatPhone, isDemoMode, sendEmailCode, sessionMethods, signInWithPassword, signOut, toast, useProfile, useRealtime,
+  useSession, verifyEmailCode, type DriverApplication, type Profile,
 } from "@hc/shared";
 import type { Session } from "@supabase/supabase-js";
-import { Clock, KeyRound, LogOut, Mail, ShieldAlert, ShieldCheck, UserRound, XCircle } from "lucide-react";
+import { Clock, KeyRound, LogOut, Mail, MailCheck, ShieldAlert, ShieldCheck, UserRound, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-
-/** Logo Google officiel (lucide-react n'a pas d'icônes de marque). */
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden>
-      <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.48a5.55 5.55 0 0 1-2.4 3.64v3h3.88c2.27-2.09 3.56-5.17 3.56-8.83Z" />
-      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3c-1.08.72-2.46 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.1A12 12 0 0 0 12 24Z" />
-      <path fill="#FBBC05" d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58v-3.1H1.26a12 12 0 0 0 0 10.78l4.01-3.1Z" />
-      <path fill="#EA4335" d="M12 4.75c1.76 0 3.34.6 4.58 1.79l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.26 6.61l4.01 3.1C6.22 6.86 8.87 4.75 12 4.75Z" />
-    </svg>
-  );
-}
 
 function Screen({ children }: { children: ReactNode }) {
   return (
@@ -43,15 +31,110 @@ function LogoutButton({ label = "Changer de compte" }: { label?: string }) {
   );
 }
 
-const isGoogleAccount = (session: Session) => {
-  const meta = session.user.app_metadata as { provider?: string; providers?: string[] };
-  return meta.provider === "google" || Boolean(meta.providers?.includes("google"));
-};
+/** Session ouverte avec un email prouvé : code reçu par email (otp) ou Google (oauth). */
+const hasProvenEmail = (session: Session) =>
+  sessionMethods(session).some((m) => m === "otp" || m === "magiclink" || m === "oauth");
 
-// ----------------------------------------------------------------- accueil : Google ou mot de passe
+const RESEND_SECONDS = 60;
 
-function DriverWelcome() {
-  const [google, setGoogle] = useState(false);
+// ----------------------------------------------------------------- accueil : code par email (ou mot de passe)
+
+/** Démo uniquement : aucun email n'est envoyé, le serveur de démo donne le code à afficher. */
+function useDemoCode(email: string, sentAt: number) {
+  const [code, setCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isDemoMode || !sentAt) return;
+    fetch(`${env.supabaseUrl}/demo/otp?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json() as Promise<{ code: string | null }>)
+      .then((r) => setCode(r.code), () => setCode(null));
+  }, [email, sentAt]);
+  return code;
+}
+
+function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [sentAt, setSentAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  const [resending, setResending] = useState(false);
+  const demoCode = useDemoCode(email, sentAt);
+  const wait = Math.max(0, RESEND_SECONDS - Math.floor((now - sentAt) / 1000));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const verify = async (value: string) => {
+    if (value.length !== 6 || verifying) return;
+    setVerifying(true);
+    setError(null);
+    try {
+      await verifyEmailCode(email, value);
+      // la session s'ouvre : la porte affiche la suite (inscription ou tableau de bord)
+    } catch (err) {
+      setError(errorMessage(err));
+      setCode("");
+      setVerifying(false);
+    }
+  };
+
+  const resend = async () => {
+    setResending(true);
+    setError(null);
+    try {
+      await sendEmailCode(email);
+      setSentAt(Date.now());
+      toast.success("Nouveau code envoyé");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <div className="mb-5 flex flex-col items-center text-center">
+        <div className="grid size-14 place-items-center rounded-full bg-accent/15 text-accent"><MailCheck className="size-7" /></div>
+        <h1 className="mt-3 text-xl font-extrabold">Entrez votre code</h1>
+        <p className="mt-1 text-sm text-fg-muted">
+          Un code à 6 chiffres a été envoyé à <b className="text-fg">{email}</b>. Pensez à regarder dans les spams.
+        </p>
+      </div>
+      <form onSubmit={(e) => { e.preventDefault(); void verify(code); }} className="flex flex-col gap-4" noValidate>
+        <label className="sr-only" htmlFor="otp-code">Code à 6 chiffres</label>
+        <input id="otp-code" value={code} autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+          aria-invalid={error ? true : undefined}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, "").slice(0, 6);
+            setCode(value);
+            setError(null);
+            if (value.length === 6) void verify(value);
+          }}
+          placeholder="••••••"
+          className="h-16 w-full rounded-2xl border border-line bg-surface-2 text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-fg outline-none transition placeholder:text-fg-muted/40 focus:border-accent focus:ring-2 focus:ring-accent/25 aria-[invalid=true]:border-red-500" />
+        {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500" role="alert">{error}</p>}
+        <Button type="submit" size="lg" full loading={verifying} disabled={code.length !== 6}>Valider</Button>
+      </form>
+      {demoCode && (
+        <p className="mt-4 rounded-xl border border-dashed border-amber/60 bg-amber/10 px-3 py-2 text-center text-sm text-fg-muted">
+          <b className="text-fg">Mode démo</b> — aucun email n'est envoyé. Votre code : <b className="font-mono text-fg" data-demo-code>{demoCode}</b>
+        </p>
+      )}
+      <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+        <button type="button" onClick={onBack} className="font-bold text-fg-muted hover:text-fg">Changer d'email</button>
+        <button type="button" onClick={() => void resend()} disabled={wait > 0 || resending}
+          className="font-bold text-accent disabled:text-fg-muted">
+          {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
+        </button>
+      </div>
+    </Screen>
+  );
+}
+
+function PasswordLogin({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -72,27 +155,7 @@ function DriverWelcome() {
 
   return (
     <Screen>
-      <Brand subtitle="Houcine Chapati — livraisons" />
-      <Button size="lg" full variant="secondary" loading={google} icon={!google && <GoogleIcon className="size-5" />}
-        onClick={async () => {
-          setGoogle(true);
-          try {
-            await signInWithGoogle("/");
-          } catch (err) {
-            toast.error(errorMessage(err));
-            setGoogle(false);
-          }
-        }}>
-        Continuer avec Google
-      </Button>
-      <p className="mt-2 text-center text-xs text-fg-muted">
-        Nouveau livreur ? Inscrivez-vous avec Google : le restaurant valide ensuite votre compte.
-      </p>
-
-      <div className="my-5 flex items-center gap-3 text-xs font-bold uppercase text-fg-muted" aria-hidden>
-        <span className="h-px flex-1 bg-line" />ou<span className="h-px flex-1 bg-line" />
-      </div>
-
+      <Brand subtitle="Connexion avec mot de passe" />
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         <Field label="Email">
           {(p) => (
@@ -118,9 +181,67 @@ function DriverWelcome() {
       {isDemoMode && (
         <p className="mt-4 rounded-xl border border-dashed border-amber/60 bg-amber/10 px-3 py-2 text-xs text-fg-muted">
           <b className="text-fg">Mode démo</b> — livreurs existants : karim@demo.dz, yanis@demo.dz (mot de passe demo1234).
-          « Continuer avec Google » simule un nouveau livreur (aucun vrai Google n'est contacté).
         </p>
       )}
+      <button type="button" onClick={onBack} className="mt-4 w-full text-center text-sm font-bold text-accent">
+        Recevoir plutôt un code par email
+      </button>
+    </Screen>
+  );
+}
+
+/**
+ * Accueil : le livreur saisit son email et reçoit un code à 6 chiffres
+ * (connexion et inscription, sans mot de passe). Les comptes créés par le
+ * restaurant avec un mot de passe gardent la connexion par mot de passe.
+ */
+function DriverWelcome() {
+  const [mode, setMode] = useState<"email" | "code" | "password">("email");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const send = async (e: FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    setError(null);
+    try {
+      await sendEmailCode(email);
+      setMode("code");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (mode === "code") return <CodeStep email={email.trim().toLowerCase()} onBack={() => setMode("email")} />;
+  if (mode === "password") return <PasswordLogin onBack={() => setMode("email")} />;
+
+  return (
+    <Screen>
+      <Brand subtitle="Houcine Chapati — livraisons" />
+      <form onSubmit={send} className="flex flex-col gap-4" noValidate>
+        <Field label="Votre email" hint="Vous recevrez un code à 6 chiffres pour vous connecter ou vous inscrire.">
+          {(p) => (
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+              <Input {...p} type="email" autoComplete="email" inputMode="email" required value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }} className="pl-10" placeholder="vous@exemple.com" />
+            </div>
+          )}
+        </Field>
+        {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500" role="alert">{error}</p>}
+        <Button type="submit" size="lg" full loading={sending} disabled={!/^\S+@\S+\.\S+$/.test(email.trim())}>
+          Recevoir mon code
+        </Button>
+      </form>
+      <p className="mt-3 text-center text-xs text-fg-muted">
+        Nouveau livreur ? Après le code, complétez votre fiche : le restaurant valide ensuite votre compte.
+      </p>
+      <button type="button" onClick={() => setMode("password")} className="mt-5 w-full text-center text-sm font-bold text-fg-muted hover:text-fg">
+        Se connecter avec un mot de passe
+      </button>
     </Screen>
   );
 }
@@ -162,7 +283,7 @@ function SignupForm({ session, previous, onSent }: {
       <div className="mb-5 flex flex-col items-center text-center">
         <div className="grid size-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-500"><UserRound className="size-7" /></div>
         <h1 className="mt-3 text-xl font-extrabold">Inscription livreur</h1>
-        <p className="mt-1 text-sm text-fg-muted">Votre identité est confirmée par Google. Complétez votre fiche :</p>
+        <p className="mt-1 text-sm text-fg-muted">Votre email est confirmé par le code. Complétez votre fiche :</p>
       </div>
       {previous?.status === "REJECTED" && (
         <p className="mb-4 flex gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500" role="alert">
@@ -182,11 +303,11 @@ function SignupForm({ session, previous, onSent }: {
           {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" value={phone}
             onChange={(e) => setPhone(e.target.value)} placeholder="05 55 12 34 56" maxLength={20} />}
         </Field>
-        <Field label="Email" hint="Celui de votre compte Google (confirmé par Google).">
+        <Field label="Email" hint="Confirmé par le code reçu par email.">
           {(p) => (
             <div className="relative">
               <Input {...p} type="email" value={session.user.email ?? ""} readOnly autoComplete="email" className="pr-10" />
-              <ShieldCheck className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-emerald-500" aria-label="Confirmé par Google" />
+              <ShieldCheck className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-emerald-500" aria-label="Email confirmé" />
             </div>
           )}
         </Field>
@@ -243,12 +364,12 @@ function DriverSignup({ session, onApproved }: { session: Session; onApproved: (
     }
   }, [application?.status, onApproved]);
 
-  if (!isGoogleAccount(session)) {
+  if (!hasProvenEmail(session)) {
     return (
       <Screen>
         <EmptyState icon={<ShieldAlert className="size-7 text-brand" />} title="Ce compte n'est pas un compte livreur"
           action={<LogoutButton />}>
-          {session.user.email ?? "Ce compte"} n'a pas accès à l'espace livreur. Pour vous inscrire, utilisez « Continuer avec Google ».
+          {session.user.email ?? "Ce compte"} n'a pas accès à l'espace livreur. Pour vous inscrire, déconnectez-vous puis connectez-vous avec le code reçu par email.
         </EmptyState>
       </Screen>
     );

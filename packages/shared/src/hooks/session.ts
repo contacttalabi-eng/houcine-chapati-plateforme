@@ -65,6 +65,36 @@ export function useProfile(userId: string | undefined) {
   return { profile, error, reload };
 }
 
+/**
+ * Connexion par code à 6 chiffres reçu par email (Supabase « Email OTP »).
+ * Étape 1 : envoie le code (crée le compte au besoin). Le modèle d'email
+ * « Magic Link » du projet Supabase doit contenir {{ .Token }} (voir README).
+ */
+export async function sendEmailCode(email: string): Promise<void> {
+  const { error } = await sb().auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: true } });
+  if (error) throw error;
+}
+
+/** Étape 2 : vérifie le code ; ouvre la session (email prouvé). */
+export async function verifyEmailCode(email: string, code: string): Promise<void> {
+  const { error } = await sb().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.replace(/\D/g, ""), type: "email" });
+  if (error) throw error;
+}
+
+/**
+ * Méthodes utilisées pour ouvrir la session, lues dans le jeton signé par
+ * Supabase (claim « amr ») : "otp" (code email), "oauth" (Google),
+ * "password", "anonymous"… La base vérifie la même information côté serveur.
+ */
+export function sessionMethods(session: Session | null | undefined): string[] {
+  try {
+    const payload = JSON.parse(atob(session!.access_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/")));
+    return Array.isArray(payload.amr) ? payload.amr.map((m: { method?: string }) => String(m.method ?? "")) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function signInWithPassword(email: string, password: string) {
   const { error } = await sb().auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw error;

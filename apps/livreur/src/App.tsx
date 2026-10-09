@@ -1,6 +1,6 @@
 import {
   EmptyState, FullScreenLoader, Toaster, errorMessage, fetchDriverByProfile, fetchDriverOrders, matchPath,
-  reportDriverLocation, signOut, useNotificationFeed, usePath, useRealtime, useResyncOnFocus, useWakeLock,
+  reportDriverLocation, sessionMethods, signOut, useNotificationFeed, usePath, useRealtime, useResyncOnFocus, useWakeLock,
   useWatchPosition, Button, type Driver, type OrderWithItems, type Profile,
 } from "@hc/shared";
 import { MapsProvider } from "@hc/shared/maps";
@@ -19,7 +19,7 @@ export interface DriverContext {
   driver: Driver;
   /** Email du compte connecté (Google ou email) */
   email: string | null;
-  /** Mode de connexion : "google" ou "email" */
+  /** Mode de connexion : "otp" (code email), "google" ou "password" */
   provider: string;
   orders: OrderWithItems[];
   live: boolean;
@@ -137,7 +137,7 @@ export function App() {
         <DriverGate>
           {({ profile, session }) => (
             <DriverApp profile={profile} userId={session.user.id} email={session.user.email ?? null}
-              provider={String((session.user.app_metadata as { provider?: string }).provider ?? "email")} />
+              provider={sessionMethods(session).includes("oauth") ? "google" : sessionMethods(session).includes("otp") ? "otp" : "password"} />
           )}
         </DriverGate>
         <ThemedToaster />
