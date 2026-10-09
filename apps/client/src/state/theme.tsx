@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { setBaseStatusBarColor } from "@hc/shared";
 
 /**
  * Thème de l'application client : clair, sombre ou automatique (préférence du
@@ -49,7 +50,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useLayoutEffect(() => {
     document.documentElement.setAttribute("data-theme", resolved);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", META_COLORS[resolved]);
+    setBaseStatusBarColor(META_COLORS[resolved]);
   }, [resolved]);
 
   const setPreference = useCallback((next: ThemePreference) => {

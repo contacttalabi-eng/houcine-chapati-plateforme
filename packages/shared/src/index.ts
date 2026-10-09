@@ -23,6 +23,7 @@ export * from "./hooks/customerAccount";
 export * from "./hooks/geolocation";
 export * from "./hooks/alerts";
 export * from "./hooks/now";
+export * from "./hooks/statusBar";
 export * from "./router";
 
 // Interface

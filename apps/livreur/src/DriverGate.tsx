@@ -2,7 +2,7 @@ import {
   EmptyState, Field, FullScreenLoader, Input, applyAsDriver, confirmPasswordResetCode, confirmSignupCode, env,
   errorMessage, fetchMyDriverApplication, formatPhone, isDemoMode, resendSignupCode, sendPasswordResetCode,
   sessionMethods, setNewPassword, signInWithPassword, signOut, signUpWithPassword, toast, useProfile, useRealtime,
-  useSession, type DriverApplication, type Profile,
+  useSession, useStatusBarColor, type DriverApplication, type Profile,
 } from "@hc/shared";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -12,7 +12,10 @@ import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from
 import { CubeIcon, LogoCutout, PinIcon, Pill } from "./components/brand";
 
 /** Fond jaune fluo, logo détouré, carte blanche (thème clair forcé à l'intérieur). */
+const NEON = "#e6fa32";
+
 function Screen({ children, onBack }: { children: ReactNode; onBack?: () => void }) {
+  useStatusBarColor(NEON);
   return (
     <main className="min-h-dvh bg-[var(--neon)] text-[var(--neon-ink)]">
       <div className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
@@ -70,6 +73,7 @@ const RESEND_SECONDS = 60;
 
 /** Écran de couverture, reproduit d'après la maquette « couverture application livreur ». */
 function Cover({ onStart }: { onStart: () => void }) {
+  useStatusBarColor(NEON);
   return (
     <main className="min-h-dvh bg-[var(--neon)] text-[var(--neon-ink)]">
       <div className="relative mx-auto flex min-h-dvh max-w-md flex-col overflow-hidden">

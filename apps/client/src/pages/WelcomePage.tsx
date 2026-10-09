@@ -1,6 +1,6 @@
-import { cx } from "@hc/shared";
+import { cx, useStatusBarColor } from "@hc/shared";
 import { ArrowRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { PlateCarousel, type PlateItem } from "../components/PlateCarousel";
 
 const DISHES: (PlateItem & { text: string })[] = [
@@ -16,19 +16,11 @@ const DISHES: (PlateItem & { text: string })[] = [
  * ouvre le menu ; aucun compte n'est demandé.
  */
 export function WelcomePage({ onStart }: { onStart: () => void }) {
+  // Barre d'état du téléphone en vert, comme le fond, le temps de l'écran d'ouverture
+  useStatusBarColor("#2f9440");
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState<1 | -1>(1);
   const letterV = useRef<HTMLSpanElement>(null);
-
-  // Barre du navigateur du téléphone en vert, comme le fond, le temps de l'écran d'ouverture
-  useEffect(() => {
-    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    const previous = meta?.content;
-    meta?.setAttribute("content", "#2f9440");
-    return () => {
-      if (meta && previous) meta.setAttribute("content", previous);
-    };
-  }, []);
 
   const goTo = (next: number, direction: 1 | -1 = next > index ? 1 : -1) => {
     if (next === index) return;

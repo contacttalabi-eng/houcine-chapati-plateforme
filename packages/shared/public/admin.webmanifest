@@ -1,0 +1,10 @@
+{
+  "name": "Houcine Chapati — Administration",
+  "short_name": "HC Admin",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#FAF7F2",
+  "icons": [{ "src": "/brand/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
+}

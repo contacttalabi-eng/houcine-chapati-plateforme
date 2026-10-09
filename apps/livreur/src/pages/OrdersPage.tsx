@@ -1,6 +1,6 @@
 import {
   Link, Sheet, algiersDayStart, cx, errorMessage, fetchMenu, formatDA, isAudioUnlocked, requestSystemNotifications,
-  setDriverAvailability, signOut, toast, unlockAudio, type MenuCategory, type OrderWithItems,
+  setDriverAvailability, signOut, toast, unlockAudio, useStatusBarColor, type MenuCategory, type OrderWithItems,
 } from "@hc/shared";
 import {
   ArrowRight, BellRing, CalendarDays, Check, ChevronRight, History, LogOut, Menu, Motorbike, Navigation, Search, Store,
@@ -272,6 +272,7 @@ function MenuSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
  * cours et ses étapes, ou statut), puis tuiles, livraisons et menu du jour.
  */
 export function OrdersPage({ ctx }: { ctx: DriverContext }) {
+  useStatusBarColor("#0d0d0d");
   const [menuOpen, setMenuOpen] = useState(false);
   const [menu, setMenu] = useState<MenuCategory[]>([]);
   useEffect(() => {
