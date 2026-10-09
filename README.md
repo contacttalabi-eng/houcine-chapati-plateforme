@@ -94,7 +94,7 @@ npx supabase db push --include-seed
 
 Les futures évolutions de la base seront de nouvelles migrations appliquées par `npx supabase db push`.
 
-> **Projet Supabase déjà installé ?** Appliquez aussi **`20261012000900_driver_email_code.sql`** (inscription des livreurs par code email : remplace seulement la fonction `driver_apply`) et **`20261011000800_driver_history.sql`** (onglet *Historique* de l'app livreur : fonction `driver_delivery_history`, additive, sans données personnelles des clients), puis la migration **`20261010000700_driver_applications.sql`** (inscription des livreurs, § 5) avec `npx supabase db push`, ou collez-la dans le *SQL Editor* → **Run**. Elle est **additive** (nouvelle table `driver_applications` et deux fonctions) : rien n'est supprimé ni modifié. Sans elle, le bouton « Continuer avec Google » de l'app livreur affiche une erreur ; tout le reste fonctionne.
+> **Projet Supabase déjà installé ?** Appliquez aussi **`20261013001000_driver_password_recovery.sql`** (inscription livreur par email + mot de passe : remplace seulement la fonction `driver_apply`, pour accepter les codes de confirmation d'inscription et de réinitialisation en plus des anciens codes de connexion), **`20261012000900_driver_email_code.sql`** (même fonction, étape précédente) et **`20261011000800_driver_history.sql`** (onglet *Historique* de l'app livreur : fonction `driver_delivery_history`, additive, sans données personnelles des clients), puis la migration **`20261010000700_driver_applications.sql`** (inscription des livreurs, § 5) avec `npx supabase db push`, ou collez-la dans le *SQL Editor* → **Run**. Elle est **additive** (nouvelle table `driver_applications` et deux fonctions) : rien n'est supprimé ni modifié. Sans elle, le bouton « Continuer avec Google » de l'app livreur affiche une erreur ; tout le reste fonctionne.
 >
 > La migration `20261009000600_customer_address.sql` (fonction `customer_save_address`) est **additive** : elle ne modifie ni ne supprime aucune donnée. Elle n'est plus utilisée par l'application client depuis le passage à la commande sans compte ; l'appliquer ou non ne change rien au fonctionnement.
 
@@ -122,20 +122,22 @@ Le rôle est stocké dans `public.profiles.role` et **ne peut pas être modifié
 select private.promote_to_driver('livreur@exemple.com', 'Prénom Nom', '0661000000');
 ```
 
-**Connexion et inscription des livreurs par code reçu par email** — application livreur → saisir son email → **Recevoir mon code** :
+**Connexion et inscription des livreurs par email + mot de passe** — application livreur → **Commencer** → écran de connexion :
 
-1. Supabase envoie un **code à 6 chiffres** par email ; le livreur le saisit (connexion sans mot de passe). La première fois, il complète **prénom, nom et téléphone** (l'email, prouvé par le code, n'est pas modifiable).
-2. Sa demande arrive **en direct** dans *Administration → Livreurs → Demandes d'inscription* (avec une alerte), où vous pouvez **Approuver**, **Refuser** ou l'appeler.
-3. Tant que la demande n'est pas approuvée, le compte n'a **aucun accès** aux commandes ni aux données des clients (vérifié côté base, pas seulement à l'écran). Dès l'approbation, son tableau de bord s'ouvre tout seul. Un refus lui permet d'envoyer une nouvelle demande.
+1. **Connexion** : email + mot de passe, comme une application classique.
+2. **Créer un compte** (nouveau livreur) : email + mot de passe, puis un **code à 6 chiffres** confirme l'adresse (envoyé à l'instant). Une fois le code validé, le livreur complète **prénom, nom et téléphone** (l'email, prouvé par le code, n'est pas modifiable).
+3. **Mot de passe oublié** : email → **code à 6 chiffres** → nouveau mot de passe → le livreur arrive **directement** dans l'application (pas de reconnexion séparée). Un livreur créé par l'administration (§ « Créer un livreur ») peut aussi s'en servir pour définir son premier mot de passe.
+4. Une nouvelle demande d'inscription arrive **en direct** dans *Administration → Livreurs → Demandes d'inscription* (avec une alerte), où vous pouvez **Approuver**, **Refuser** ou l'appeler.
+5. Tant que la demande n'est pas approuvée, le compte n'a **aucun accès** aux commandes ni aux données des clients (vérifié côté base, pas seulement à l'écran). Dès l'approbation, son tableau de bord s'ouvre tout seul. Un refus lui permet d'envoyer une nouvelle demande.
 
-La base n'accepte une demande que si la session a été ouverte **avec le code reçu par email** (ou avec Google) : elle le vérifie dans le jeton signé par Supabase (claim `amr`) et exige un email confirmé. Un compte ouvert par simple mot de passe ou une session invité est refusé (`EMAIL_NOT_VERIFIED`). Les livreurs créés par l'administration avec un mot de passe peuvent continuer à l'utiliser (lien « Se connecter avec un mot de passe »), ou se connecter par code.
+La base n'accepte une demande que si la session a été ouverte avec un **email prouvé** : code de confirmation d'inscription, code de réinitialisation de mot de passe, ou Google — vérifié dans le jeton signé par Supabase (claim `amr`), exige en plus un email confirmé. Un compte ouvert par simple mot de passe (sans être passé par un de ces codes) ou une session invité est refusé (`EMAIL_NOT_VERIFIED`).
 
 **À régler dans Supabase pour les codes par email :**
 
 1. *Authentication → Sign In / Providers → Email* : **Email** activé ; **Email OTP Length = 6** ; *Email OTP Expiration* : 600 secondes (10 min) conseillées.
-2. *Authentication → Emails → Templates → **Magic Link*** : le modèle doit contenir **`{{ .Token }}`** (c'est le code). Exemple :
+2. *Authentication → Emails → Templates* : les modèles **Confirm signup** (création de compte) et **Reset Password** (mot de passe oublié) doivent chacun contenir **`{{ .Token }}`** (c'est le code). Exemple pour les deux :
    * Sujet : `Votre code Houcine Chapati : {{ .Token }}`
-   * Corps : `<h2>Votre code de connexion</h2><p>Entrez ce code dans l'application livreur Houcine Chapati :</p><p style="font-size:32px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p><p>Il expire dans 10 minutes. Si vous n'avez rien demandé, ignorez cet email.</p>`
+   * Corps : `<h2>Votre code</h2><p>Entrez ce code dans l'application livreur Houcine Chapati :</p><p style="font-size:32px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p><p>Il expire dans 10 minutes. Si vous n'avez rien demandé, ignorez cet email.</p>`
 3. **Envoi des emails** : le service d'email intégré de Supabase sert uniquement aux essais (envoi limité à quelques emails par heure, et seulement aux adresses des membres de votre équipe Supabase). Pour de vrais livreurs, configurez un **SMTP** (*Authentication → Emails → SMTP Settings*), par exemple Brevo ou Resend (offres gratuites suffisantes pour démarrer), avec une adresse d'expéditeur vérifiée chez ce fournisseur.
 
 D'autres requêtes utiles se trouvent dans [`supabase/scripts/comptes.sql`](supabase/scripts/comptes.sql).
@@ -163,7 +165,7 @@ Pour que chaque téléphone ne voie que **ses propres** commandes (suivi en dire
 
 **Protection contre les abus** : `place_order` limite déjà chaque téléphone à 3 commandes en cours et 3 commandes par 10 minutes, et refuse les positions hors d'Algérie ou hors du rayon de livraison. Pour aller plus loin en production, activez un CAPTCHA (*Authentication → Attack Protection*, Cloudflare Turnstile ou hCaptcha) — il faudra alors ajouter le widget correspondant à l'écran de commande.
 
-La connexion Google des clients a été retirée de l'application client. Le fournisseur **Google** n'est plus nécessaire : les livreurs se connectent avec un **code reçu par email** (§ 5). Si vous voulez tout de même l'activer : *Authentication → Sign In / Providers → Google* (Client ID / Secret créés dans Google Cloud Console → *Credentials → OAuth client ID*, type *Web application*, URI de redirection `https://<ref-du-projet>.supabase.co/auth/v1/callback`). Ajoutez aussi l'adresse de l'app livreur (ex. `https://livreur.votre-domaine.dz`) dans *Authentication → URL Configuration → Redirect URLs*.
+La connexion Google des clients a été retirée de l'application client. Le fournisseur **Google** n'est plus nécessaire : les livreurs se connectent avec **email + mot de passe** (§ 5). Si vous voulez tout de même l'activer : *Authentication → Sign In / Providers → Google* (Client ID / Secret créés dans Google Cloud Console → *Credentials → OAuth client ID*, type *Web application*, URI de redirection `https://<ref-du-projet>.supabase.co/auth/v1/callback`). Ajoutez aussi l'adresse de l'app livreur (ex. `https://livreur.votre-domaine.dz`) dans *Authentication → URL Configuration → Redirect URLs*.
 
 **Mode démo local** (`npm run demo`) : les sessions invité fonctionnent sans aucune configuration, et « Continuer avec Google » de l'app livreur est **simulé** (compte `samir.livreur@gmail.com`, aucun vrai Google n'est contacté) pour essayer l'inscription et la validation.
 

@@ -38,15 +38,22 @@ export async function createUser(db: Db, email: string | null): Promise<string> 
 /** Exécute fn avec les droits d'un utilisateur (JWT simulé), comme via l'API. */
 /**
  * Mode de connexion simulé dans le jeton (claim « amr » de Supabase) :
- * password = mot de passe, otp = code reçu par email, google = OAuth Google.
+ * password = mot de passe, otp/magiclink = anciens codes de connexion,
+ * email_signup = code de confirmation d'inscription, recovery = code de
+ * réinitialisation de mot de passe, google = OAuth Google.
  */
-export type SignInMethod = "password" | "otp" | "google" | "anonymous";
+export type SignInMethod = "password" | "otp" | "magiclink" | "email_signup" | "recovery" | "google" | "anonymous";
+
+const AMR_METHOD: Record<SignInMethod, string> = {
+  password: "password", otp: "otp", magiclink: "magiclink", email_signup: "email/signup",
+  recovery: "recovery", google: "oauth", anonymous: "anonymous",
+};
 
 export async function as<T>(
   db: Db, userId: string | null, fn: (tx: Tx) => Promise<T>, method: SignInMethod = "password",
 ): Promise<T> {
   const provider = method === "google" ? "google" : method === "anonymous" ? "anonymous" : "email";
-  const amr = [{ method: method === "google" ? "oauth" : method, timestamp: Math.floor(Date.now() / 1000) }];
+  const amr = [{ method: AMR_METHOD[method], timestamp: Math.floor(Date.now() / 1000) }];
   return db.transaction(async (tx) => {
     await tx.exec(`set local role ${userId ? "authenticated" : "anon"}`);
     await tx.query("select set_config('request.jwt.claims', $1, true)", [

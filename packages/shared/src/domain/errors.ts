@@ -12,6 +12,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_PHONE: "Numéro de téléphone invalide. Exemple : 0555 12 34 56.",
   GOOGLE_REQUIRED: "Connectez-vous avec votre compte Google pour vous inscrire comme livreur.",
   EMAIL_NOT_VERIFIED: "Connectez-vous avec le code reçu par email pour vous inscrire comme livreur.",
+  EMAIL_ALREADY_USED: "Un compte existe déjà avec cet email. Connectez-vous, ou utilisez « Mot de passe oublié ».",
   ALREADY_STAFF: "Ce compte est déjà un compte livreur ou administrateur.",
   ALREADY_DECIDED: "Cette demande a déjà été traitée.",
   NOT_FOUND: "Élément introuvable (il a peut-être été supprimé).",
@@ -80,10 +81,18 @@ export function errorMessage(error: unknown): string {
   }
   if (/signups not allowed for otp/i.test(message)) return "Aucun compte avec cet email.";
   if (/unable to validate email address|invalid format/i.test(message)) return "Adresse email invalide.";
-  if (/error sending (magic link|confirmation|otp)? ?email/i.test(message)) {
+  if (/error sending (magic link|confirmation|recovery|otp)? ?email/i.test(message)) {
     return "L'email n'a pas pu être envoyé. Réessayez plus tard ou contactez le restaurant.";
   }
   if (message.includes("Email not confirmed")) return "Adresse email non confirmée.";
+  if (/password should be at least (\d+) characters?/i.test(message)) {
+    const n = message.match(/at least (\d+)/i)?.[1];
+    return `Le mot de passe doit faire au moins ${n ?? 8} caractères.`;
+  }
+  if (/new password should be different from the old password/i.test(message)) {
+    return "Choisissez un mot de passe différent de l'ancien.";
+  }
+  if (/user already registered/i.test(message)) return "Un compte existe déjà avec cet email.";
   if (/anonymous sign-ins are disabled/i.test(message)) {
     return "Les commandes sans compte ne sont pas activées (Supabase → Authentication → Anonymous sign-ins).";
   }

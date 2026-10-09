@@ -96,7 +96,7 @@ const pkceCodes = new Map();
 
 // ----------------------------------------------------------------- jetons (démo : non signés)
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
-// method : password | otp | oauth | anonymous (claim « amr » des jetons Supabase)
+// method : password | email/signup | recovery | otp | oauth | anonymous (claim « amr » des jetons Supabase)
 function tokenFor(user, method) {
   const exp = Math.floor(Date.now() / 1000) + 3600;
   const amr = [{ method, timestamp: Math.floor(Date.now() / 1000) }];
@@ -416,36 +416,53 @@ async function handle(req, url, user) {
   if (path === "/auth/v1/signup" && req.method === "POST") {
     if (!body?.email) return { status: 200, json: session(await createAuthUser(null, null), "anonymous") };
     const email = String(body.email).trim().toLowerCase();
-    if ([...users.values()].some((u) => u.email === email)) {
-      return { status: 422, json: { code: "user_already_exists", error_code: "user_already_exists", msg: "User already registered" } };
-    }
-    return { status: 200, json: session(await createAuthUser(email, String(body.password ?? "")), "password") };
-  }
-  // Connexion par code reçu par email (Email OTP) : envoi du code…
-  if (path === "/auth/v1/otp" && req.method === "POST") {
-    const email = String(body?.email ?? "").trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      return { status: 400, json: { code: "validation_failed", error_code: "validation_failed", msg: "Unable to validate email address: invalid format" } };
-    }
-    const exists = [...users.values()].some((u) => u.email === email);
-    if (!exists && body?.create_user === false) {
-      return { status: 422, json: { code: "otp_disabled", error_code: "otp_disabled", msg: "Signups not allowed for otp" } };
-    }
+    const existing = [...users.values()].find((u) => u.email === email);
+    // Comme le vrai Supabase : ne révèle jamais qu'un compte existe déjà
+    // (identities vide, aucune session, aucun code envoyé).
+    if (existing) return { status: 200, json: { ...authUserJson(existing), identities: [] } };
+    const u = await createAuthUser(email, String(body.password ?? ""));
+    // Email pas encore confirmé : il faut d'abord valider le code envoyé.
+    await db.query("update auth.users set email_confirmed_at = null where id = $1", [u.id]);
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
     otpCodes.set(email, { code, expires: Date.now() + 10 * 60_000 });
-    console.log(`[démo] code de connexion pour ${email} : ${code}`);
+    console.log(`[démo] code de confirmation d'inscription pour ${email} : ${code}`);
+    // Pas de session tant que l'email n'est pas confirmé (pas d'access_token).
+    return { status: 200, json: { ...authUserJson(u), identities: [{ id: u.id, provider: "email" }] } };
+  }
+  // Mot de passe oublié : envoie un code (ne révèle jamais si l'email existe).
+  if (path === "/auth/v1/recover" && req.method === "POST") {
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const existing = [...users.values()].find((u) => u.email === email);
+    if (existing) {
+      const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      otpCodes.set(email, { code, expires: Date.now() + 10 * 60_000 });
+      console.log(`[démo] code de réinitialisation pour ${email} : ${code}`);
+    }
     return { status: 200, json: {} };
   }
-  // … puis vérification (crée le compte au premier code, email confirmé)
+  // Renvoie un code de confirmation d'inscription en attente.
+  if (path === "/auth/v1/resend" && req.method === "POST") {
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    otpCodes.set(email, { code, expires: Date.now() + 10 * 60_000 });
+    console.log(`[démo] code renvoyé pour ${email} : ${code}`);
+    return { status: 200, json: {} };
+  }
+  // Vérifie le code : confirmation d'inscription ("signup") ou réinitialisation
+  // de mot de passe ("recovery") — chacune ouvre une session avec sa propre
+  // méthode dans le claim « amr », comme le vrai Supabase.
   if (path === "/auth/v1/verify" && req.method === "POST") {
     const email = String(body?.email ?? "").trim().toLowerCase();
+    const type = String(body?.type ?? "email");
     const entry = otpCodes.get(email);
     if (!entry || entry.expires < Date.now() || entry.code !== String(body?.token ?? "")) {
       return { status: 403, json: { code: "otp_expired", error_code: "otp_expired", msg: "Token has expired or is invalid" } };
     }
     otpCodes.delete(email);
     const u = [...users.values()].find((x) => x.email === email) ?? await createAuthUser(email, null, "email");
-    return { status: 200, json: session(u, "otp") };
+    if (type === "signup") await db.query("update auth.users set email_confirmed_at = now() where id = $1", [u.id]);
+    const method = type === "signup" ? "email/signup" : type === "recovery" ? "recovery" : "otp";
+    return { status: 200, json: session(u, method) };
   }
   // Démo uniquement : dernier code envoyé à une adresse (aucun vrai email n'est envoyé)
   if (path === "/demo/otp" && req.method === "GET") {
@@ -466,7 +483,7 @@ async function handle(req, url, user) {
   if (path === "/auth/v1/token" && req.method === "POST") {
     const grant = url.searchParams.get("grant_type");
     if (grant === "refresh_token") {
-      const [, id, method = "password"] = String(body?.refresh_token ?? "").match(/^rt_([^_]+)_?(\w*)$/) ?? [];
+      const [, id, method = "password"] = String(body?.refresh_token ?? "").match(/^rt_([^_]+)_?([\w/]*)$/) ?? [];
       const u = id ? users.get(id) : undefined;
       if (!u) return { status: 400, json: { error: "invalid_grant", error_description: "Invalid Refresh Token", msg: "Invalid Refresh Token" } };
       return { status: 200, json: session(u, method || "password") };
@@ -485,7 +502,12 @@ async function handle(req, url, user) {
     return { status: 200, json: session(u, "password") };
   }
   if (path === "/auth/v1/user") {
-    return user ? { status: 200, json: authUserJson(user) } : { status: 401, json: { msg: "Invalid JWT", code: "bad_jwt" } };
+    if (!user) return { status: 401, json: { msg: "Invalid JWT", code: "bad_jwt" } };
+    if ((req.method === "PUT" || req.method === "POST") && body?.password) {
+      const stored = users.get(user.id);
+      if (stored) stored.password = String(body.password);
+    }
+    return { status: 200, json: authUserJson(user) };
   }
   if (path === "/auth/v1/logout") return { status: 204 };
 
@@ -545,7 +567,7 @@ const server = createServer(async (req, res) => {
   const cors = {
     "Access-Control-Allow-Origin": req.headers.origin ?? "*",
     "Access-Control-Allow-Headers": req.headers["access-control-request-headers"] ?? "*",
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS, HEAD",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
     "Access-Control-Expose-Headers": "Content-Range, X-Total-Count",
   };
   if (req.method === "OPTIONS") {

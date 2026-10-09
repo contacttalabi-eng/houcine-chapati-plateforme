@@ -504,6 +504,18 @@ describe("inscription des livreurs : email prouvé (code ou Google) + validation
       (await tx.query<{ status: string }>("select * from driver_apply('Nadia', 'Ait Ali', '0770998877')")).rows[0]!, "otp");
     expect(again.status).toBe("PENDING");
   });
+
+  it("accepte un email prouvé par code de confirmation d'inscription ou de réinitialisation de mot de passe", async () => {
+    const bySignupCode = await createUser(db, "nouveau.motdepasse@gmail.com");
+    const app1 = await as(db, bySignupCode,
+      (tx) => tx.query("select * from driver_apply('Lina', 'Amrani', '0550332211')"), "email_signup");
+    expect(app1.rows[0].status).toBe("PENDING");
+
+    const byRecoveryCode = await createUser(db, "mdp.oublie@gmail.com");
+    const app2 = await as(db, byRecoveryCode,
+      (tx) => tx.query("select * from driver_apply('Reda', 'Chérif', '0550998877')"), "recovery");
+    expect(app2.rows[0].status).toBe("PENDING");
+  });
 });
 
 describe("historique des courses du livreur (sans données personnelles des clients)", () => {

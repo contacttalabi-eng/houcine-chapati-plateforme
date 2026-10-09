@@ -1,7 +1,8 @@
 import {
-  EmptyState, Field, FullScreenLoader, Input, applyAsDriver, env, errorMessage, fetchMyDriverApplication,
-  formatPhone, isDemoMode, sendEmailCode, sessionMethods, signInWithPassword, signOut, toast, useProfile, useRealtime,
-  useSession, verifyEmailCode, type DriverApplication, type Profile,
+  EmptyState, Field, FullScreenLoader, Input, applyAsDriver, confirmPasswordResetCode, confirmSignupCode, env,
+  errorMessage, fetchMyDriverApplication, formatPhone, isDemoMode, resendSignupCode, sendPasswordResetCode,
+  sessionMethods, setNewPassword, signInWithPassword, signOut, signUpWithPassword, toast, useProfile, useRealtime,
+  useSession, type DriverApplication, type Profile,
 } from "@hc/shared";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -55,9 +56,13 @@ const ErrorText = ({ children }: { children: ReactNode }) => (
   <p className="rounded-2xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-600" role="alert">{children}</p>
 );
 
-/** Session ouverte avec un email prouvé : code reçu par email (otp) ou Google (oauth). */
+/**
+ * Session ouverte avec un email prouvé : code de confirmation d'inscription,
+ * code de réinitialisation de mot de passe, Google, ou anciens parcours par
+ * code de connexion (comptes créés avant ce changement).
+ */
 const hasProvenEmail = (session: Session) =>
-  sessionMethods(session).some((m) => m === "otp" || m === "magiclink" || m === "oauth");
+  sessionMethods(session).some((m) => ["email/signup", "recovery", "otp", "magiclink", "oauth"].includes(m));
 
 const RESEND_SECONDS = 60;
 
@@ -95,7 +100,7 @@ function Cover({ onStart }: { onStart: () => void }) {
   );
 }
 
-// ----------------------------------------------------------------- email → code (ou mot de passe)
+// ----------------------------------------------------------------- connexion, inscription, mot de passe oublié
 
 /** Démo uniquement : aucun email n'est envoyé, le serveur de démo donne le code à afficher. */
 function useDemoCode(email: string, sentAt: number) {
@@ -109,7 +114,14 @@ function useDemoCode(email: string, sentAt: number) {
   return code;
 }
 
-function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
+/** Saisie du code à 6 chiffres, réutilisée pour la confirmation d'inscription et la réinitialisation. */
+function CodeEntry({ email, title, description, verify, resend, onBack, onVerified }: {
+  email: string; title: string; description: ReactNode;
+  verify: (email: string, code: string) => Promise<void>;
+  resend: (email: string) => Promise<void>;
+  onBack: () => void;
+  onVerified: () => void;
+}) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
@@ -124,13 +136,13 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const verify = async (value: string) => {
+  const doVerify = async (value: string) => {
     if (value.length !== 6 || verifying) return;
     setVerifying(true);
     setError(null);
     try {
-      await verifyEmailCode(email, value);
-      // la session s'ouvre : la porte affiche la suite (inscription ou tableau de bord)
+      await verify(email, value);
+      onVerified();
     } catch (err) {
       setError(errorMessage(err));
       setCode("");
@@ -138,11 +150,11 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
     }
   };
 
-  const resend = async () => {
+  const doResend = async () => {
     setResending(true);
     setError(null);
     try {
-      await sendEmailCode(email);
+      await resend(email);
       setSentAt(Date.now());
       toast.success("Nouveau code envoyé");
     } catch (err) {
@@ -154,10 +166,8 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
 
   return (
     <Screen onBack={onBack}>
-      <Title icon={<MailCheck className="size-6" />} title="Entrez votre code">
-        Un code à 6 chiffres a été envoyé à <b className="text-black">{email}</b>. Pensez à regarder dans les spams.
-      </Title>
-      <form onSubmit={(e) => { e.preventDefault(); void verify(code); }} className="flex flex-col gap-4" noValidate>
+      <Title icon={<MailCheck className="size-6" />} title={title}>{description}</Title>
+      <form onSubmit={(e) => { e.preventDefault(); void doVerify(code); }} className="flex flex-col gap-4" noValidate>
         <label className="sr-only" htmlFor="otp-code">Code à 6 chiffres</label>
         <input id="otp-code" value={code} autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6}
           aria-invalid={error ? true : undefined}
@@ -165,7 +175,7 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
             const value = e.target.value.replace(/\D/g, "").slice(0, 6);
             setCode(value);
             setError(null);
-            if (value.length === 6) void verify(value);
+            if (value.length === 6) void doVerify(value);
           }}
           placeholder="••••••"
           className="h-16 w-full rounded-2xl border-2 border-black/10 bg-[#f4f4f5] text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-black outline-none transition placeholder:text-black/25 focus:border-black aria-[invalid=true]:border-red-500" />
@@ -179,7 +189,7 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
       )}
       <div className="mt-5 flex items-center justify-between gap-3 text-sm">
         <button type="button" onClick={onBack} className="font-bold text-black/55 hover:text-black">Changer d'email</button>
-        <button type="button" onClick={() => void resend()} disabled={wait > 0 || resending}
+        <button type="button" onClick={() => void doResend()} disabled={wait > 0 || resending}
           className="font-extrabold text-black underline underline-offset-4 disabled:text-black/40 disabled:no-underline">
           {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
         </button>
@@ -188,7 +198,8 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
   );
 }
 
-function PasswordLogin({ onBack }: { onBack: () => void }) {
+/** Connexion (écran principal après « Commencer ») : email + mot de passe. */
+function LoginStep({ onBack, onSignup, onForgot }: { onBack: () => void; onSignup: () => void; onForgot: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -200,6 +211,7 @@ function PasswordLogin({ onBack }: { onBack: () => void }) {
     setError(null);
     try {
       await signInWithPassword(email, password);
+      // la session s'ouvre : la porte affiche la suite (inscription ou tableau de bord)
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -209,13 +221,13 @@ function PasswordLogin({ onBack }: { onBack: () => void }) {
 
   return (
     <Screen onBack={onBack}>
-      <Title icon={<KeyRound className="size-6" />} title="Espace livreur">Connexion avec mot de passe</Title>
+      <Title icon={<KeyRound className="size-6" />} title="Espace livreur">Connectez-vous avec votre email et votre mot de passe.</Title>
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         <Field label="Email">
           {(p) => (
             <div className="relative">
               <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
-              <Input {...p} type="email" autoComplete="username" inputMode="email" required value={email}
+              <Input {...p} type="email" autoComplete="username" inputMode="email" required autoFocus value={email}
                 onChange={(e) => setEmail(e.target.value)} className="pl-10" placeholder="vous@exemple.com" />
             </div>
           )}
@@ -237,25 +249,28 @@ function PasswordLogin({ onBack }: { onBack: () => void }) {
           <b className="text-black">Mode démo</b> — livreurs existants : karim@demo.dz, yanis@demo.dz (mot de passe demo1234).
         </p>
       )}
-      <button type="button" onClick={onBack} className="mt-5 w-full text-center text-sm font-extrabold text-black underline underline-offset-4">
-        Recevoir plutôt un code par email
-      </button>
+      <div className="mt-5 flex items-center justify-between gap-3 text-sm">
+        <button type="button" onClick={onSignup} className="font-extrabold text-black underline underline-offset-4">Créer un compte</button>
+        <button type="button" onClick={onForgot} className="font-bold text-black/55 hover:text-black">Mot de passe oublié ?</button>
+      </div>
     </Screen>
   );
 }
 
-function EmailStep({ onBack, onSent, onPassword }: { onBack: () => void; onSent: (email: string) => void; onPassword: () => void }) {
+/** Création de compte : email + mot de passe, confirmés ensuite par un code. */
+function SignupPasswordStep({ onBack, onSent }: { onBack: () => void; onSent: (email: string) => void }) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const valid = /^\S+@\S+\.\S+$/.test(email.trim());
+  const valid = /^\S+@\S+\.\S+$/.test(email.trim()) && password.length >= 8;
 
-  const send = async (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     setSending(true);
     setError(null);
     try {
-      await sendEmailCode(email);
+      await signUpWithPassword(email, password);
       onSent(email.trim().toLowerCase());
     } catch (err) {
       setError(errorMessage(err));
@@ -266,47 +281,171 @@ function EmailStep({ onBack, onSent, onPassword }: { onBack: () => void; onSent:
 
   return (
     <Screen onBack={onBack}>
-      <Title title="Espace livreur">Recevez un code à 6 chiffres par email pour vous connecter ou vous inscrire.</Title>
-      <form onSubmit={send} className="flex flex-col gap-4" noValidate>
-        <div>
-          <label htmlFor="driver-email" className="mb-1.5 block text-sm font-bold">Votre email</label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-black/40" />
-            <input id="driver-email" type="email" autoComplete="email" inputMode="email" required value={email} autoFocus
-              onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="vous@exemple.com"
-              className="h-14 w-full rounded-full border-2 border-black/10 bg-[#f4f4f5] pl-12 pr-4 text-base font-semibold text-black outline-none transition placeholder:text-black/35 focus:border-black focus:bg-white" />
-          </div>
-        </div>
+      <Title icon={<UserRound className="size-6" />} title="Créer un compte">
+        Un code à 6 chiffres confirmera votre email. Vous complèterez ensuite votre fiche.
+      </Title>
+      <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+        <Field label="Email">
+          {(p) => (
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+              <Input {...p} type="email" autoComplete="email" inputMode="email" required autoFocus value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }} className="pl-10" placeholder="vous@exemple.com" />
+            </div>
+          )}
+        </Field>
+        <Field label="Mot de passe" hint="8 caractères minimum.">
+          {(p) => (
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+              <Input {...p} type="password" autoComplete="new-password" required value={password}
+                onChange={(e) => setPassword(e.target.value)} className="pl-10" />
+            </div>
+          )}
+        </Field>
         {error && <ErrorText>{error}</ErrorText>}
         <Pill type="submit" loading={sending} disabled={!valid} icon={<ArrowRight className="size-5" />}>Recevoir mon code</Pill>
       </form>
-      <p className="mt-4 text-center text-xs font-medium text-black/55">
-        Nouveau livreur ? Après le code, complétez votre fiche : le restaurant valide ensuite votre compte.
-      </p>
-      <button type="button" onClick={onPassword}
-        className="mt-5 w-full text-center text-sm font-extrabold text-black/70 underline underline-offset-4 hover:text-black">
-        Se connecter avec un mot de passe
-      </button>
+    </Screen>
+  );
+}
+
+/** Mot de passe oublié, étape 1 : l'email auquel envoyer le code. */
+function ForgotEmailStep({ onBack, onSent }: { onBack: () => void; onSent: (email: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const valid = /^\S+@\S+\.\S+$/.test(email.trim());
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    setError(null);
+    try {
+      await sendPasswordResetCode(email);
+      onSent(email.trim().toLowerCase());
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Screen onBack={onBack}>
+      <Title icon={<KeyRound className="size-6" />} title="Mot de passe oublié">
+        Recevez un code à 6 chiffres pour choisir un nouveau mot de passe.
+      </Title>
+      <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+        <Field label="Email">
+          {(p) => (
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+              <Input {...p} type="email" autoComplete="email" inputMode="email" required autoFocus value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }} className="pl-10" placeholder="vous@exemple.com" />
+            </div>
+          )}
+        </Field>
+        {error && <ErrorText>{error}</ErrorText>}
+        <Pill type="submit" loading={sending} disabled={!valid} icon={<ArrowRight className="size-5" />}>Recevoir mon code</Pill>
+      </form>
+    </Screen>
+  );
+}
+
+/** Nouveau mot de passe, après vérification du code de réinitialisation : connecté directement ensuite. */
+function NewPasswordStep({ onDone }: { onDone: () => void }) {
+  const session = useSession();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (password.length < 8) { setError("Le mot de passe doit faire au moins 8 caractères."); return; }
+    if (password !== confirm) { setError("Les deux mots de passe ne correspondent pas."); return; }
+    setSaving(true);
+    try {
+      await setNewPassword(password);
+      toast.success("Mot de passe mis à jour");
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Title icon={<KeyRound className="size-6" />} title="Nouveau mot de passe">
+        {session?.user.email ? <>Pour <b className="text-black">{session.user.email}</b>. Vous arriverez directement dans l'application ensuite.</>
+          : "Vous arriverez directement dans l'application ensuite."}
+      </Title>
+      <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+        <Field label="Nouveau mot de passe" hint="8 caractères minimum.">
+          {(p) => (
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+              <Input {...p} type="password" autoComplete="new-password" required autoFocus value={password}
+                onChange={(e) => setPassword(e.target.value)} className="pl-10" />
+            </div>
+          )}
+        </Field>
+        <Field label="Confirmez le mot de passe">
+          {(p) => (
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+              <Input {...p} type="password" autoComplete="new-password" required value={confirm}
+                onChange={(e) => setConfirm(e.target.value)} className="pl-10" />
+            </div>
+          )}
+        </Field>
+        {error && <ErrorText>{error}</ErrorText>}
+        <Pill type="submit" loading={saving} disabled={!password || !confirm}>Valider et continuer</Pill>
+      </form>
+      <div className="mt-3"><LogoutButton label="Annuler" /></div>
     </Screen>
   );
 }
 
 /**
- * Accueil : couverture, puis le livreur saisit son email et reçoit un code à
- * 6 chiffres (connexion et inscription, sans mot de passe). Les comptes créés
- * par le restaurant avec un mot de passe gardent la connexion par mot de passe.
+ * Accueil : couverture, puis connexion par email + mot de passe. « Créer un
+ * compte » et « Mot de passe oublié » confirment l'email par un code à 6
+ * chiffres ; la réinitialisation ouvre directement l'application ensuite
+ * (onRecoverySignedIn, géré par DriverGate car la session est déjà active).
  */
-function DriverWelcome() {
-  const [mode, setMode] = useState<"cover" | "email" | "code" | "password">("cover");
+function DriverWelcome({ onRecoverySignedIn }: { onRecoverySignedIn: () => void }) {
+  const [mode, setMode] = useState<"cover" | "login" | "signup-email" | "signup-code" | "forgot-email" | "forgot-code">("cover");
   const [email, setEmail] = useState("");
 
-  if (mode === "cover") return <Cover onStart={() => setMode("email")} />;
-  if (mode === "code") return <CodeStep email={email} onBack={() => setMode("email")} />;
-  if (mode === "password") return <PasswordLogin onBack={() => setMode("email")} />;
-  return (
-    <EmailStep onBack={() => setMode("cover")} onPassword={() => setMode("password")}
-      onSent={(value) => { setEmail(value); setMode("code"); }} />
-  );
+  if (mode === "cover") return <Cover onStart={() => setMode("login")} />;
+  if (mode === "signup-email") {
+    return (
+      <SignupPasswordStep onBack={() => setMode("login")}
+        onSent={(mail) => { setEmail(mail); setMode("signup-code"); }} />
+    );
+  }
+  if (mode === "signup-code") {
+    return (
+      <CodeEntry email={email} title="Confirmez votre email"
+        description={<>Un code à 6 chiffres a été envoyé à <b className="text-black">{email}</b> pour confirmer votre inscription.</>}
+        verify={confirmSignupCode} resend={resendSignupCode} onBack={() => setMode("signup-email")}
+        onVerified={() => undefined /* la session s'ouvre : la porte affiche l'inscription livreur */} />
+    );
+  }
+  if (mode === "forgot-email") return <ForgotEmailStep onBack={() => setMode("login")} onSent={(mail) => { setEmail(mail); setMode("forgot-code"); }} />;
+  if (mode === "forgot-code") {
+    return (
+      <CodeEntry email={email} title="Entrez votre code"
+        description={<>Un code à 6 chiffres a été envoyé à <b className="text-black">{email}</b>. Pensez à regarder dans les spams.</>}
+        verify={confirmPasswordResetCode} resend={sendPasswordResetCode} onBack={() => setMode("forgot-email")}
+        onVerified={onRecoverySignedIn} />
+    );
+  }
+  return <LoginStep onBack={() => setMode("cover")} onSignup={() => setMode("signup-email")} onForgot={() => setMode("forgot-email")} />;
 }
 
 // ----------------------------------------------------------------- inscription
@@ -434,7 +573,7 @@ function DriverSignup({ session, onApproved }: { session: Session; onApproved: (
   if (!hasProvenEmail(session)) {
     return (
       <Blocked title="Ce compte n'est pas un compte livreur" action={<LogoutButton />}>
-        {session.user.email ?? "Ce compte"} n'a pas accès à l'espace livreur. Pour vous inscrire, déconnectez-vous puis connectez-vous avec le code reçu par email.
+        {session.user.email ?? "Ce compte"} n'a pas accès à l'espace livreur. Pour vous inscrire, déconnectez-vous puis créez un compte (email confirmé par un code).
       </Blocked>
     );
   }
@@ -447,16 +586,23 @@ function DriverSignup({ session, onApproved }: { session: Session; onApproved: (
 }
 
 /**
- * Porte de l'application livreur : connexion (code email ou mot de passe), puis
+ * Porte de l'application livreur : connexion (email + mot de passe), puis
  * inscription / attente de validation pour un nouveau compte, ou accès direct
  * pour un compte livreur. La vraie protection reste la RLS.
+ *
+ * Après un code de réinitialisation de mot de passe, la session s'ouvre tout
+ * de suite (recovery) : settingNewPassword force l'écran « Nouveau mot de
+ * passe » avant de laisser passer vers le tableau de bord, pour que l'email
+ * prouvé serve réellement à choisir un nouveau mot de passe.
  */
 export function DriverGate({ children }: { children: (ctx: { session: Session; profile: Profile }) => ReactNode }) {
   const session = useSession();
+  const [settingNewPassword, setSettingNewPassword] = useState(false);
   const { profile, error, reload } = useProfile(session?.user.id);
 
+  if (session && settingNewPassword) return <NewPasswordStep onDone={() => setSettingNewPassword(false)} />;
   if (session === undefined || (session && profile === undefined)) return <FullScreenLoader />;
-  if (!session) return <DriverWelcome />;
+  if (!session) return <DriverWelcome onRecoverySignedIn={() => setSettingNewPassword(true)} />;
   if (profile?.role === "DRIVER") return <>{children({ session, profile })}</>;
   if (!profile || error) {
     return (

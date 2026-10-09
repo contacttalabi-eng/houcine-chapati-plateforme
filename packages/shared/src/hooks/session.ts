@@ -66,25 +66,10 @@ export function useProfile(userId: string | undefined) {
 }
 
 /**
- * Connexion par code à 6 chiffres reçu par email (Supabase « Email OTP »).
- * Étape 1 : envoie le code (crée le compte au besoin). Le modèle d'email
- * « Magic Link » du projet Supabase doit contenir {{ .Token }} (voir README).
- */
-export async function sendEmailCode(email: string): Promise<void> {
-  const { error } = await sb().auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: true } });
-  if (error) throw error;
-}
-
-/** Étape 2 : vérifie le code ; ouvre la session (email prouvé). */
-export async function verifyEmailCode(email: string, code: string): Promise<void> {
-  const { error } = await sb().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.replace(/\D/g, ""), type: "email" });
-  if (error) throw error;
-}
-
-/**
  * Méthodes utilisées pour ouvrir la session, lues dans le jeton signé par
- * Supabase (claim « amr ») : "otp" (code email), "oauth" (Google),
- * "password", "anonymous"… La base vérifie la même information côté serveur.
+ * Supabase (claim « amr ») : "password", "email/signup" (code de confirmation
+ * d'inscription), "recovery" (code de réinitialisation), "oauth" (Google)…
+ * La base vérifie la même information côté serveur.
  */
 export function sessionMethods(session: Session | null | undefined): string[] {
   try {
@@ -96,7 +81,53 @@ export function sessionMethods(session: Session | null | undefined): string[] {
 }
 
 export async function signInWithPassword(email: string, password: string) {
-  const { error } = await sb().auth.signInWithPassword({ email: email.trim(), password });
+  const { error } = await sb().auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+  if (error) throw error;
+}
+
+/**
+ * Création de compte (email + mot de passe). L'email n'est pas encore prouvé :
+ * un code à 6 chiffres est envoyé (modèle « Confirm signup », {{ .Token }} —
+ * voir README) et doit être validé par confirmSignupCode avant toute session.
+ */
+export async function signUpWithPassword(email: string, password: string): Promise<void> {
+  const { data, error } = await sb().auth.signUp({ email: email.trim().toLowerCase(), password });
+  if (error) throw error;
+  // Supabase ne révèle jamais qu'un email est déjà pris : un compte existant
+  // renvoie un utilisateur sans nouvelle identité plutôt qu'une erreur.
+  if (data.user && data.user.identities?.length === 0) throw new Error("EMAIL_ALREADY_USED");
+}
+
+/** Valide le code envoyé à l'inscription : ouvre la session (email prouvé). */
+export async function confirmSignupCode(email: string, code: string): Promise<void> {
+  const { error } = await sb().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.replace(/\D/g, ""), type: "signup" });
+  if (error) throw error;
+}
+
+/** Renvoie le code de confirmation d'inscription. */
+export async function resendSignupCode(email: string): Promise<void> {
+  const { error } = await sb().auth.resend({ type: "signup", email: email.trim().toLowerCase() });
+  if (error) throw error;
+}
+
+/**
+ * Mot de passe oublié : envoie un code à 6 chiffres (modèle « Reset Password »,
+ * {{ .Token }} — voir README). Ne révèle jamais si l'email existe ou non.
+ */
+export async function sendPasswordResetCode(email: string): Promise<void> {
+  const { error } = await sb().auth.resetPasswordForEmail(email.trim().toLowerCase());
+  if (error) throw error;
+}
+
+/** Valide le code de réinitialisation : ouvre une session (email prouvé). */
+export async function confirmPasswordResetCode(email: string, code: string): Promise<void> {
+  const { error } = await sb().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.replace(/\D/g, ""), type: "recovery" });
+  if (error) throw error;
+}
+
+/** Définit le nouveau mot de passe (session de réinitialisation déjà ouverte). */
+export async function setNewPassword(password: string): Promise<void> {
+  const { error } = await sb().auth.updateUser({ password });
   if (error) throw error;
 }
 
