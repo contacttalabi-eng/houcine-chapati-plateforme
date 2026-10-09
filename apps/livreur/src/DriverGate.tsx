@@ -1,37 +1,59 @@
 import {
-  Button, Card, EmptyState, Field, FullScreenLoader, Input, Logo, applyAsDriver, env, errorMessage, fetchMyDriverApplication,
+  EmptyState, Field, FullScreenLoader, Input, applyAsDriver, env, errorMessage, fetchMyDriverApplication,
   formatPhone, isDemoMode, sendEmailCode, sessionMethods, signInWithPassword, signOut, toast, useProfile, useRealtime,
   useSession, verifyEmailCode, type DriverApplication, type Profile,
 } from "@hc/shared";
 import type { Session } from "@supabase/supabase-js";
 import {
-  ArrowRight, Clock, KeyRound, LogOut, Mail, MailCheck, Package, ShieldAlert, ShieldCheck, UserRound, XCircle,
+  ArrowLeft, ArrowRight, Clock, KeyRound, LogOut, Mail, MailCheck, ShieldAlert, ShieldCheck, UserRound, XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { CubeIcon, LogoCutout, PinIcon, Pill } from "./components/brand";
 
-function Screen({ children }: { children: ReactNode }) {
+/** Fond jaune fluo, logo détouré, carte blanche (thème clair forcé à l'intérieur). */
+function Screen({ children, onBack }: { children: ReactNode; onBack?: () => void }) {
   return (
-    <main className="grid min-h-dvh place-items-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
-      <Card className="w-full max-w-sm p-6 shadow-xl animate-fade-up sm:p-8">{children}</Card>
+    <main className="min-h-dvh bg-[var(--neon)] text-[var(--neon-ink)]">
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <div className="flex items-center justify-between">
+          {onBack ? (
+            <button type="button" onClick={onBack} aria-label="Retour"
+              className="grid size-11 place-items-center rounded-full bg-black text-white transition active:scale-95">
+              <ArrowLeft className="size-5" />
+            </button>
+          ) : <CubeIcon className="size-11" />}
+        </div>
+        <LogoCutout className="mx-auto -mt-4 h-28 drop-shadow-[0_6px_10px_rgb(0_0_0/0.15)]" />
+        <div data-theme="light" className="mt-5 rounded-[2rem] bg-white p-6 text-[#0d0d0d] shadow-[0_20px_50px_-20px_rgb(0_0_0/0.35)] animate-fade-up">
+          {children}
+        </div>
+      </div>
     </main>
   );
 }
 
-function Brand({ subtitle }: { subtitle: string }) {
+function Title({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-col items-center text-center">
-      <Logo size={80} />
-      <h1 className="mt-3 font-display text-3xl uppercase tracking-wide">Espace livreur</h1>
-      <p className="text-sm text-fg-muted">{subtitle}</p>
+    <div className="mb-5">
+      {icon && <div className="mb-3 grid size-12 place-items-center rounded-full bg-[var(--neon)] text-black">{icon}</div>}
+      <h1 className="text-[1.65rem] font-extrabold leading-tight tracking-tight">{title}</h1>
+      {children && <p className="mt-1.5 text-[15px] text-black/60">{children}</p>}
     </div>
   );
 }
 
 function LogoutButton({ label = "Changer de compte" }: { label?: string }) {
   return (
-    <Button variant="secondary" full icon={<LogOut className="size-4" />} onClick={() => void signOut()}>{label}</Button>
+    <button type="button" onClick={() => void signOut()}
+      className="flex h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-black/10 font-bold text-black/75 transition hover:border-black/30">
+      <LogOut className="size-4" /> {label}
+    </button>
   );
 }
+
+const ErrorText = ({ children }: { children: ReactNode }) => (
+  <p className="rounded-2xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-600" role="alert">{children}</p>
+);
 
 /** Session ouverte avec un email prouvé : code reçu par email (otp) ou Google (oauth). */
 const hasProvenEmail = (session: Session) =>
@@ -39,7 +61,41 @@ const hasProvenEmail = (session: Session) =>
 
 const RESEND_SECONDS = 60;
 
-// ----------------------------------------------------------------- accueil : code par email (ou mot de passe)
+// ----------------------------------------------------------------- couverture
+
+/** Écran de couverture, reproduit d'après la maquette « couverture application livreur ». */
+function Cover({ onStart }: { onStart: () => void }) {
+  return (
+    <main className="min-h-dvh bg-[var(--neon)] text-[var(--neon-ink)]">
+      <div className="relative mx-auto flex min-h-dvh max-w-md flex-col overflow-hidden">
+        <div className="relative z-10 px-6 pt-[max(1.25rem,env(safe-area-inset-top))]">
+          <CubeIcon className="size-11" />
+          <LogoCutout className="mx-auto -mt-5 h-[9.5rem] drop-shadow-[0_8px_12px_rgb(0_0_0/0.15)]" />
+          <h1 className="mt-5 text-[2.85rem] font-extrabold leading-[1.02] tracking-[-0.045em]">
+            Livré.<br />À l'heure.
+          </h1>
+          <div className="relative mt-3 pr-16">
+            <p className="text-[1.05rem] font-medium leading-snug text-black/85">
+              Suivi en temps réel et itinéraire optimisé pour chaque commande.
+            </p>
+            <PinIcon className="absolute -top-9 right-1 h-[4.5rem] w-14" />
+          </div>
+        </div>
+
+        <div className="relative -mt-2 min-h-[19rem] flex-1">
+          <img src="/brand/livreur-route.webp" alt="" aria-hidden width={928} height={932}
+            className="absolute inset-0 size-full object-cover object-top [mask-image:linear-gradient(to_bottom,transparent,#000_12%)]" />
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <Pill onClick={onStart} className="h-16 text-xl" icon={<ArrowRight className="size-6" />}>Commencer</Pill>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ----------------------------------------------------------------- email → code (ou mot de passe)
 
 /** Démo uniquement : aucun email n'est envoyé, le serveur de démo donne le code à afficher. */
 function useDemoCode(email: string, sentAt: number) {
@@ -97,14 +153,10 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
   };
 
   return (
-    <Screen>
-      <div className="mb-5 flex flex-col items-center text-center">
-        <div className="grid size-14 place-items-center rounded-full bg-accent/15 text-accent"><MailCheck className="size-7" /></div>
-        <h1 className="mt-3 text-xl font-extrabold">Entrez votre code</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Un code à 6 chiffres a été envoyé à <b className="text-fg">{email}</b>. Pensez à regarder dans les spams.
-        </p>
-      </div>
+    <Screen onBack={onBack}>
+      <Title icon={<MailCheck className="size-6" />} title="Entrez votre code">
+        Un code à 6 chiffres a été envoyé à <b className="text-black">{email}</b>. Pensez à regarder dans les spams.
+      </Title>
       <form onSubmit={(e) => { e.preventDefault(); void verify(code); }} className="flex flex-col gap-4" noValidate>
         <label className="sr-only" htmlFor="otp-code">Code à 6 chiffres</label>
         <input id="otp-code" value={code} autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6}
@@ -116,19 +168,19 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
             if (value.length === 6) void verify(value);
           }}
           placeholder="••••••"
-          className="h-16 w-full rounded-2xl border border-line bg-surface-2 text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-fg outline-none transition placeholder:text-fg-muted/40 focus:border-accent focus:ring-2 focus:ring-accent/25 aria-[invalid=true]:border-red-500" />
-        {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500" role="alert">{error}</p>}
-        <Button type="submit" size="lg" full loading={verifying} disabled={code.length !== 6}>Valider</Button>
+          className="h-16 w-full rounded-2xl border-2 border-black/10 bg-[#f4f4f5] text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-black outline-none transition placeholder:text-black/25 focus:border-black aria-[invalid=true]:border-red-500" />
+        {error && <ErrorText>{error}</ErrorText>}
+        <Pill type="submit" loading={verifying} disabled={code.length !== 6}>Valider</Pill>
       </form>
       {demoCode && (
-        <p className="mt-4 rounded-xl border border-dashed border-amber/60 bg-amber/10 px-3 py-2 text-center text-sm text-fg-muted">
-          <b className="text-fg">Mode démo</b> — aucun email n'est envoyé. Votre code : <b className="font-mono text-fg" data-demo-code>{demoCode}</b>
+        <p className="mt-4 rounded-2xl border border-dashed border-black/30 bg-[var(--neon)]/40 px-3 py-2 text-center text-sm text-black/70">
+          <b className="text-black">Mode démo</b> — aucun email n'est envoyé. Votre code : <b className="font-mono text-black" data-demo-code>{demoCode}</b>
         </p>
       )}
-      <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-        <button type="button" onClick={onBack} className="font-bold text-fg-muted hover:text-fg">Changer d'email</button>
+      <div className="mt-5 flex items-center justify-between gap-3 text-sm">
+        <button type="button" onClick={onBack} className="font-bold text-black/55 hover:text-black">Changer d'email</button>
         <button type="button" onClick={() => void resend()} disabled={wait > 0 || resending}
-          className="font-bold text-accent disabled:text-fg-muted">
+          className="font-extrabold text-black underline underline-offset-4 disabled:text-black/40 disabled:no-underline">
           {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
         </button>
       </div>
@@ -156,8 +208,8 @@ function PasswordLogin({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <Screen>
-      <Brand subtitle="Connexion avec mot de passe" />
+    <Screen onBack={onBack}>
+      <Title icon={<KeyRound className="size-6" />} title="Espace livreur">Connexion avec mot de passe</Title>
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         <Field label="Email">
           {(p) => (
@@ -177,31 +229,26 @@ function PasswordLogin({ onBack }: { onBack: () => void }) {
             </div>
           )}
         </Field>
-        {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500" role="alert">{error}</p>}
-        <Button type="submit" size="lg" full loading={loading} disabled={!email || !password}>Se connecter</Button>
+        {error && <ErrorText>{error}</ErrorText>}
+        <Pill type="submit" loading={loading} disabled={!email || !password}>Se connecter</Pill>
       </form>
       {isDemoMode && (
-        <p className="mt-4 rounded-xl border border-dashed border-amber/60 bg-amber/10 px-3 py-2 text-xs text-fg-muted">
-          <b className="text-fg">Mode démo</b> — livreurs existants : karim@demo.dz, yanis@demo.dz (mot de passe demo1234).
+        <p className="mt-4 rounded-2xl border border-dashed border-black/30 bg-[var(--neon)]/40 px-3 py-2 text-xs text-black/70">
+          <b className="text-black">Mode démo</b> — livreurs existants : karim@demo.dz, yanis@demo.dz (mot de passe demo1234).
         </p>
       )}
-      <button type="button" onClick={onBack} className="mt-4 w-full text-center text-sm font-bold text-accent">
+      <button type="button" onClick={onBack} className="mt-5 w-full text-center text-sm font-extrabold text-black underline underline-offset-4">
         Recevoir plutôt un code par email
       </button>
     </Screen>
   );
 }
 
-/**
- * Accueil : le livreur saisit son email et reçoit un code à 6 chiffres
- * (connexion et inscription, sans mot de passe). Les comptes créés par le
- * restaurant avec un mot de passe gardent la connexion par mot de passe.
- */
-function DriverWelcome() {
-  const [mode, setMode] = useState<"email" | "code" | "password">("email");
+function EmailStep({ onBack, onSent, onPassword }: { onBack: () => void; onSent: (email: string) => void; onPassword: () => void }) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const valid = /^\S+@\S+\.\S+$/.test(email.trim());
 
   const send = async (e: FormEvent) => {
     e.preventDefault();
@@ -209,7 +256,7 @@ function DriverWelcome() {
     setError(null);
     try {
       await sendEmailCode(email);
-      setMode("code");
+      onSent(email.trim().toLowerCase());
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -217,57 +264,48 @@ function DriverWelcome() {
     }
   };
 
-  if (mode === "code") return <CodeStep email={email.trim().toLowerCase()} onBack={() => setMode("email")} />;
-  if (mode === "password") return <PasswordLogin onBack={() => setMode("email")} />;
-
-  const valid = /^\S+@\S+\.\S+$/.test(email.trim());
-
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-[var(--neon)] px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-[var(--neon-ink)]">
-      {/* Halo décoratif, dans l'esprit de la maquette (route / point de livraison) */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 opacity-[0.07]" aria-hidden>
-        <svg viewBox="0 0 400 200" className="h-full w-full" fill="none">
-          <path d="M-20 180 C 100 180, 140 60, 260 60 S 420 20, 440 -10" stroke="black" strokeWidth="10" strokeDasharray="2 18" strokeLinecap="round" />
-        </svg>
-      </div>
-
-      <div className="relative flex items-center justify-between">
-        <span className="grid size-11 place-items-center rounded-full bg-black text-[var(--neon)] shadow-lg shadow-black/20">
-          <Package className="size-5" />
-        </span>
-      </div>
-
-      <div className="relative mt-7 flex flex-col items-center text-center">
-        <Logo size={92} className="ring-4 ring-black" />
-        <h1 className="mt-7 font-display text-5xl uppercase leading-[0.92] tracking-tight">Livré.<br />À l'heure.</h1>
-        <p className="mt-3 max-w-[22rem] text-sm font-bold text-black/70">
-          Suivi en direct et itinéraire malin pour chaque commande.
-        </p>
-      </div>
-
-      <form onSubmit={send} className="relative mt-10 flex flex-col gap-3" noValidate>
-        <div className="relative">
-          <Mail className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-black/40" />
-          <input type="email" autoComplete="email" inputMode="email" required value={email}
-            onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="vous@exemple.com"
-            className="h-14 w-full rounded-full border-2 border-black/10 bg-white pl-12 pr-4 text-base font-bold text-black placeholder:text-black/35 outline-none transition focus:border-black" />
+    <Screen onBack={onBack}>
+      <Title title="Espace livreur">Recevez un code à 6 chiffres par email pour vous connecter ou vous inscrire.</Title>
+      <form onSubmit={send} className="flex flex-col gap-4" noValidate>
+        <div>
+          <label htmlFor="driver-email" className="mb-1.5 block text-sm font-bold">Votre email</label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-black/40" />
+            <input id="driver-email" type="email" autoComplete="email" inputMode="email" required value={email} autoFocus
+              onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="vous@exemple.com"
+              className="h-14 w-full rounded-full border-2 border-black/10 bg-[#f4f4f5] pl-12 pr-4 text-base font-semibold text-black outline-none transition placeholder:text-black/35 focus:border-black focus:bg-white" />
+          </div>
         </div>
-        {error && (
-          <p className="rounded-2xl bg-black px-4 py-2.5 text-center text-sm font-bold text-[var(--neon)]" role="alert">{error}</p>
-        )}
-        <button type="submit" disabled={!valid || sending}
-          className="flex h-14 items-center justify-center gap-2 rounded-full bg-black text-lg font-extrabold text-[var(--neon)] shadow-xl shadow-black/20 transition active:scale-[.98] disabled:opacity-40">
-          {sending ? "Envoi…" : <>Recevoir mon code <ArrowRight className="size-5" /></>}
-        </button>
+        {error && <ErrorText>{error}</ErrorText>}
+        <Pill type="submit" loading={sending} disabled={!valid} icon={<ArrowRight className="size-5" />}>Recevoir mon code</Pill>
       </form>
-      <p className="relative mt-4 text-center text-xs font-bold text-black/60">
+      <p className="mt-4 text-center text-xs font-medium text-black/55">
         Nouveau livreur ? Après le code, complétez votre fiche : le restaurant valide ensuite votre compte.
       </p>
-      <button type="button" onClick={() => setMode("password")}
-        className="relative mt-6 w-full text-center text-sm font-extrabold text-black/70 underline underline-offset-4 hover:text-black">
+      <button type="button" onClick={onPassword}
+        className="mt-5 w-full text-center text-sm font-extrabold text-black/70 underline underline-offset-4 hover:text-black">
         Se connecter avec un mot de passe
       </button>
-    </main>
+    </Screen>
+  );
+}
+
+/**
+ * Accueil : couverture, puis le livreur saisit son email et reçoit un code à
+ * 6 chiffres (connexion et inscription, sans mot de passe). Les comptes créés
+ * par le restaurant avec un mot de passe gardent la connexion par mot de passe.
+ */
+function DriverWelcome() {
+  const [mode, setMode] = useState<"cover" | "email" | "code" | "password">("cover");
+  const [email, setEmail] = useState("");
+
+  if (mode === "cover") return <Cover onStart={() => setMode("email")} />;
+  if (mode === "code") return <CodeStep email={email} onBack={() => setMode("email")} />;
+  if (mode === "password") return <PasswordLogin onBack={() => setMode("email")} />;
+  return (
+    <EmailStep onBack={() => setMode("cover")} onPassword={() => setMode("password")}
+      onSent={(value) => { setEmail(value); setMode("code"); }} />
   );
 }
 
@@ -305,13 +343,11 @@ function SignupForm({ session, previous, onSent }: {
 
   return (
     <Screen>
-      <div className="mb-5 flex flex-col items-center text-center">
-        <div className="grid size-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-500"><UserRound className="size-7" /></div>
-        <h1 className="mt-3 text-xl font-extrabold">Inscription livreur</h1>
-        <p className="mt-1 text-sm text-fg-muted">Votre email est confirmé par le code. Complétez votre fiche :</p>
-      </div>
+      <Title icon={<UserRound className="size-6" />} title="Inscription livreur">
+        Votre email est confirmé par le code. Complétez votre fiche :
+      </Title>
       {previous?.status === "REJECTED" && (
-        <p className="mb-4 flex gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500" role="alert">
+        <p className="mb-4 flex gap-2 rounded-2xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-600" role="alert">
           <XCircle className="mt-0.5 size-4 shrink-0" /> Votre précédente demande a été refusée. Vous pouvez en envoyer une nouvelle.
         </p>
       )}
@@ -332,13 +368,13 @@ function SignupForm({ session, previous, onSent }: {
           {(p) => (
             <div className="relative">
               <Input {...p} type="email" value={session.user.email ?? ""} readOnly autoComplete="email" className="pr-10" />
-              <ShieldCheck className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-emerald-500" aria-label="Email confirmé" />
+              <ShieldCheck className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-emerald-600" aria-label="Email confirmé" />
             </div>
           )}
         </Field>
-        <Button type="submit" size="lg" full loading={saving} disabled={!firstName || !lastName || !phone}>
+        <Pill type="submit" loading={saving} disabled={!firstName || !lastName || !phone} icon={<ArrowRight className="size-5" />}>
           Envoyer ma demande
-        </Button>
+        </Pill>
       </form>
       <div className="mt-3"><LogoutButton label="Annuler" /></div>
     </Screen>
@@ -348,26 +384,32 @@ function SignupForm({ session, previous, onSent }: {
 function PendingScreen({ application }: { application: DriverApplication }) {
   return (
     <Screen>
-      <div className="flex flex-col items-center text-center">
-        <div className="grid size-16 place-items-center rounded-full bg-amber/15 text-amber"><Clock className="size-8 animate-pulse" /></div>
-        <h1 className="mt-3 text-xl font-extrabold">Demande en attente</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Le restaurant doit valider votre compte. Cette page s'ouvrira toute seule dès que c'est fait.
-        </p>
-      </div>
-      <dl className="mt-5 flex flex-col gap-2 rounded-2xl bg-surface-2 p-4 text-sm">
-        <div className="flex justify-between gap-3"><dt className="text-fg-muted">Nom</dt><dd className="font-bold">{application.first_name} {application.last_name}</dd></div>
-        <div className="flex justify-between gap-3"><dt className="text-fg-muted">Téléphone</dt><dd className="font-bold">{formatPhone(application.phone)}</dd></div>
-        <div className="flex justify-between gap-3"><dt className="text-fg-muted">Email</dt><dd className="truncate font-bold">{application.email}</dd></div>
+      <Title icon={<Clock className="size-6 animate-pulse" />} title="Demande en attente">
+        Le restaurant doit valider votre compte. Cette page s'ouvrira toute seule dès que c'est fait.
+      </Title>
+      <dl className="flex flex-col gap-2 rounded-2xl bg-[#f4f4f5] p-4 text-sm">
+        <div className="flex justify-between gap-3"><dt className="text-black/55">Nom</dt><dd className="font-bold">{application.first_name} {application.last_name}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="text-black/55">Téléphone</dt><dd className="font-bold">{formatPhone(application.phone)}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="text-black/55">Email</dt><dd className="truncate font-bold">{application.email}</dd></div>
       </dl>
       <div className="mt-5"><LogoutButton label="Se déconnecter" /></div>
     </Screen>
   );
 }
 
+function Blocked({ title, children, action }: { title: string; children: ReactNode; action: ReactNode }) {
+  return (
+    <Screen>
+      <EmptyState icon={<ShieldAlert className="size-7 text-red-600" />} title={title} action={action} className="py-4">
+        {children}
+      </EmptyState>
+    </Screen>
+  );
+}
+
 /**
- * Compte Google connecté mais pas (encore) livreur : formulaire d'inscription,
- * puis attente de la validation (mise à jour en direct).
+ * Compte connecté par code email mais pas (encore) livreur : formulaire
+ * d'inscription, puis attente de la validation (mise à jour en direct).
  */
 function DriverSignup({ session, onApproved }: { session: Session; onApproved: () => void }) {
   const userId = session.user.id;
@@ -391,16 +433,13 @@ function DriverSignup({ session, onApproved }: { session: Session; onApproved: (
 
   if (!hasProvenEmail(session)) {
     return (
-      <Screen>
-        <EmptyState icon={<ShieldAlert className="size-7 text-brand" />} title="Ce compte n'est pas un compte livreur"
-          action={<LogoutButton />}>
-          {session.user.email ?? "Ce compte"} n'a pas accès à l'espace livreur. Pour vous inscrire, déconnectez-vous puis connectez-vous avec le code reçu par email.
-        </EmptyState>
-      </Screen>
+      <Blocked title="Ce compte n'est pas un compte livreur" action={<LogoutButton />}>
+        {session.user.email ?? "Ce compte"} n'a pas accès à l'espace livreur. Pour vous inscrire, déconnectez-vous puis connectez-vous avec le code reçu par email.
+      </Blocked>
     );
   }
   if (error) {
-    return <Screen><EmptyState title="Connexion impossible" action={<Button onClick={load}>Réessayer</Button>}>{error}</EmptyState></Screen>;
+    return <Blocked title="Connexion impossible" action={<Pill onClick={load}>Réessayer</Pill>}>{error}</Blocked>;
   }
   if (application === undefined || application?.status === "APPROVED") return <FullScreenLoader />;
   if (application?.status === "PENDING") return <PendingScreen application={application} />;
@@ -408,9 +447,9 @@ function DriverSignup({ session, onApproved }: { session: Session; onApproved: (
 }
 
 /**
- * Porte de l'application livreur : connexion (Google ou mot de passe), puis
- * inscription / attente de validation pour un nouveau compte Google, ou
- * accès direct pour un compte livreur. La vraie protection reste la RLS.
+ * Porte de l'application livreur : connexion (code email ou mot de passe), puis
+ * inscription / attente de validation pour un nouveau compte, ou accès direct
+ * pour un compte livreur. La vraie protection reste la RLS.
  */
 export function DriverGate({ children }: { children: (ctx: { session: Session; profile: Profile }) => ReactNode }) {
   const session = useSession();
@@ -421,21 +460,17 @@ export function DriverGate({ children }: { children: (ctx: { session: Session; p
   if (profile?.role === "DRIVER") return <>{children({ session, profile })}</>;
   if (!profile || error) {
     return (
-      <Screen>
-        <EmptyState icon={<ShieldAlert className="size-7 text-brand" />} title="Profil introuvable"
-          action={<div className="flex w-full flex-col gap-2"><Button onClick={reload}>Réessayer</Button><LogoutButton /></div>}>
-          {error ? errorMessage(error) : "Impossible de charger votre profil."}
-        </EmptyState>
-      </Screen>
+      <Blocked title="Profil introuvable"
+        action={<div className="flex w-full flex-col gap-2"><Pill onClick={reload}>Réessayer</Pill><LogoutButton /></div>}>
+        {error ? errorMessage(error) : "Impossible de charger votre profil."}
+      </Blocked>
     );
   }
   if (profile.role === "ADMIN") {
     return (
-      <Screen>
-        <EmptyState icon={<ShieldAlert className="size-7 text-brand" />} title="Compte administrateur" action={<LogoutButton />}>
-          Ce compte est un compte administrateur : utilisez l'application d'administration.
-        </EmptyState>
-      </Screen>
+      <Blocked title="Compte administrateur" action={<LogoutButton />}>
+        Ce compte est un compte administrateur : utilisez l'application d'administration.
+      </Blocked>
     );
   }
   return <DriverSignup session={session} onApproved={reload} />;

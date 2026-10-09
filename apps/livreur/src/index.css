@@ -80,6 +80,6 @@ body {
 
 /* Couverture et tableau de bord : jaune fluo + noir (maquette fournie) */
 :root {
-  --neon: #e3fb3b;
-  --neon-ink: #121005;
+  --neon: #e6fa32;
+  --neon-ink: #0d0d0d;
 }
