@@ -5,6 +5,9 @@
 {
   "name": "houcine-chapati-admin",
   "compatibility_date": "2025-09-01",
+  // adresse ….workers.dev gardée ; pas d'adresses « preview » pour les branches de test
+  "workers_dev": true,
+  "preview_urls": false,
   "assets": {
     "directory": "./dist"
   }
