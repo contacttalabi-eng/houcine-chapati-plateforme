@@ -1,0 +1,11 @@
+// Cloudflare (Workers + fichiers statiques) : publie le build de l'application.
+// Dans Cloudflare : Build command = npm run build -w @hc/client
+//                   Deploy command = npx wrangler deploy --config apps/client/wrangler.jsonc
+// "name" doit être identique au nom du projet créé dans Cloudflare.
+{
+  "name": "houcine-chapati-plateforme",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}
