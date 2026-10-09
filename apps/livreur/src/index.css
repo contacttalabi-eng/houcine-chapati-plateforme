@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@import "../../../packages/shared/src/styles/theme.css";
+@source "../../../packages/shared/src";
+
+/* -----------------------------------------------------------------------------
+   Application livreur : thème « premium » propre au livreur (l'administration
+   garde les valeurs de theme.css). Surfaces profondes et chaudes en sombre,
+   blanc net en clair, ombres douces, barre de navigation en verre dépoli.
+   ----------------------------------------------------------------------------- */
+[data-theme="light"] {
+  --hc-bg: #f7f6f4;
+  --hc-surface: #ffffff;
+  --hc-surface-2: #f2f0ed;
+  --hc-surface-3: #e7e3de;
+  --hc-fg: #1c1917;
+  --hc-fg-muted: #57534e;
+  --hc-line: rgb(28 25 23 / 0.08);
+  --hc-card-shadow: 0 1px 2px rgb(28 25 23 / 0.04), 0 10px 30px -12px rgb(28 25 23 / 0.18);
+  --hc-nav: rgb(255 255 255 / 0.88);
+  --hc-accent: #d9281c;
+}
+
+[data-theme="dark"] {
+  --hc-bg: #0b0908;
+  --hc-surface: #161110;
+  --hc-surface-2: #221a17;
+  --hc-surface-3: #30251f;
+  --hc-card-shadow: 0 1px 0 rgb(255 247 237 / 0.04), 0 14px 34px -16px rgb(0 0 0 / 0.7);
+  --hc-nav: rgb(22 17 16 / 0.86);
+  --hc-accent: #ff7a5c;
+}
+
+@utility card-shadow {
+  box-shadow: var(--hc-card-shadow);
+}
+
+@utility bg-nav {
+  background-color: var(--hc-nav);
+}
+
+/* Espace réservé en bas des pages qui ont la barre de navigation */
+@utility pb-nav {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+
+/* Fond « premium » : halo chaud discret en haut de l'écran */
+body {
+  background-image: radial-gradient(120% 60% at 50% -10%, rgb(217 40 28 / 0.14), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Barre du bas : l'icône de l'onglet choisi rebondit */
+@keyframes hc-nav-pop {
+  0% {
+    transform: scale(0.6) translateY(4px);
+  }
+  55% {
+    transform: scale(1.18) translateY(-2px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+@utility animate-nav-pop {
+  animation: hc-nav-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-nav-pop {
+    animation: none;
+  }
+}
+
+/* Mode clair : l'or et l'ambre (montants, alertes) foncés pour rester lisibles sur fond blanc */
+[data-theme="light"] .text-gold,
+[data-theme="light"] .text-amber {
+  color: #b45309;
+}

@@ -1,0 +1,248 @@
+@import "tailwindcss";
+@import "../../../packages/shared/src/styles/theme.css";
+@source "../../../packages/shared/src";
+
+/* -----------------------------------------------------------------------------
+   Application client : réglages de thème propres au client (l'administration
+   et l'app livreur gardent les valeurs de theme.css).
+   Mode clair : fond et cartes blancs, bordures discrètes. La couleur d'accent
+   (onglet actif, prix, liens) est le rouge du logo, comme une app de livraison
+   à couleur unique.
+   ----------------------------------------------------------------------------- */
+[data-theme="light"] {
+  --hc-bg: #ffffff;
+  --hc-surface: #ffffff;
+  --hc-surface-2: #f5f5f4;
+  --hc-surface-3: #e7e5e4;
+  --hc-fg: #1c1917;
+  --hc-fg-muted: #57534e;
+  --hc-line: rgb(28 25 23 / 0.1);
+  --hc-card-shadow: 0 1px 2px rgb(28 25 23 / 0.04), 0 6px 20px -8px rgb(28 25 23 / 0.12);
+  --hc-nav: rgb(255 255 255 / 0.92);
+  --hc-accent: #d9281c;
+  --hc-price: #d9281c;
+}
+
+[data-theme="dark"] {
+  --hc-bg: #0b0908;
+  --hc-surface: #171210;
+  --hc-surface-2: #231b18;
+  --hc-surface-3: #312621;
+  --hc-card-shadow: 0 1px 0 rgb(255 247 237 / 0.03);
+  --hc-nav: rgb(23 18 16 / 0.92);
+  --hc-accent: #ff6b5e;
+  --hc-price: #ff6b5e;
+}
+
+@utility card-shadow {
+  box-shadow: var(--hc-card-shadow);
+}
+
+@utility bg-nav {
+  background-color: var(--hc-nav);
+}
+
+/* Espace réservé en bas des pages qui ont la barre de navigation */
+@utility pb-nav {
+  padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+}
+
+/* Boutons principaux de l'app client : rouge du logo uni (au lieu du dégradé
+   orange → rouge partagé avec l'administration). Hors @layer : prioritaire. */
+.bg-fire {
+  background-image: none;
+  background-color: var(--color-brand);
+}
+
+/* Plat qui tourne lentement sur l'écran d'ouverture */
+@keyframes hc-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility animate-turn {
+  animation: hc-turn 24s linear infinite;
+}
+
+/* Écran d'ouverture : fond vert (comme la maquette), assiette en « O » */
+@utility bg-welcome {
+  background-color: #2f9440;
+}
+
+@utility text-welcome {
+  color: #23782f;
+}
+
+.plate {
+  /* bord blanc, léger creux puis fond de l'assiette où repose le plat */
+  background: radial-gradient(circle at 50% 46%, #ffffff 0 52%, #e9ecef 56%, #ffffff 62%, #f6f7f8 88%, #e6e8ea 100%);
+  box-shadow:
+    0 30px 60px -18px rgb(0 0 0 / 0.5),
+    inset 0 -8px 16px rgb(0 0 0 / 0.08),
+    inset 0 4px 10px rgb(255 255 255 / 0.9);
+}
+
+/* Lancement : la première assiette sort du « V » de « Vos plats »
+   (--from-x / --from-y, mesurés par WelcomePage) et monte à sa place. */
+@keyframes hc-plate-rise {
+  from {
+    transform: translate(var(--from-x, 0px), var(--from-y, 260px)) scale(0.12);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+@utility animate-plate-rise {
+  animation: hc-plate-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Changement de plat, en triangle « /\ » : la nouvelle assiette monte en
+   ligne droite depuis le bas d'un côté (--in-x, à la hauteur du « V » :
+   --in-y) jusqu'au sommet, au centre ; l'ancienne redescend en ligne droite
+   de l'autre côté (--out-x, --out-y). */
+@keyframes hc-plate-enter {
+  from {
+    transform: translate(var(--in-x, -400px), var(--in-y, 260px)) scale(0.6);
+  }
+  to {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes hc-plate-exit {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(var(--out-x, 400px), var(--out-y, 260px)) scale(0.6);
+  }
+}
+
+@utility animate-plate-enter {
+  animation: hc-plate-enter 0.7s cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+@utility animate-plate-exit {
+  animation: hc-plate-exit 0.7s cubic-bezier(0.32, 0, 0.67, 0) both;
+}
+
+/* …puis descend et remonte doucement */
+@keyframes hc-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(12px);
+  }
+}
+
+@utility animate-float {
+  animation: hc-float 3.2s ease-in-out 0.8s infinite;
+}
+
+/* Barre du bas : l'icône de l'onglet choisi rebondit */
+@keyframes hc-nav-pop {
+  0% {
+    transform: scale(0.6) translateY(4px);
+  }
+  55% {
+    transform: scale(1.18) translateY(-2px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+@utility animate-nav-pop {
+  animation: hc-nav-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Bouton panier : rebond + onde quand un plat arrive */
+@keyframes hc-cart-bump {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.18) rotate(-6deg);
+  }
+  60% {
+    transform: scale(0.94) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@utility animate-cart-bump {
+  animation: hc-cart-bump 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes hc-cart-ring {
+  from {
+    box-shadow: 0 0 0 0 rgb(217 40 28 / 0.55);
+  }
+  to {
+    box-shadow: 0 0 0 18px rgb(217 40 28 / 0);
+  }
+}
+
+@utility animate-cart-ring {
+  animation: hc-cart-ring 0.7s ease-out both;
+}
+
+/* Carte produit : petit « pouls » quand le plat est ajouté */
+@keyframes hc-card-added {
+  0% {
+    box-shadow: 0 0 0 0 rgb(5 150 105 / 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgb(5 150 105 / 0);
+  }
+}
+
+@utility animate-card-added {
+  animation: hc-card-added 0.8s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-nav-pop,
+  .animate-cart-bump,
+  .animate-cart-ring,
+  .animate-card-added {
+    animation: none;
+  }
+}
+
+/* Fiche produit : un supplément se pose sur le plat */
+@keyframes hc-topping-land {
+  from {
+    transform: scale(0) rotate(-120deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.35) rotate(10deg);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@utility animate-topping-land {
+  animation: hc-topping-land 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-topping-land {
+    animation: none;
+  }
+}

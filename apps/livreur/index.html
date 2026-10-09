@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B0908" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Houcine Chapati — Livreur</title>
+    <link rel="icon" type="image/png" href="/brand/favicon.png" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <link rel="manifest" href="/livreur.webmanifest" />
+    <script>
+      // Thème choisi (sombre par défaut) appliqué avant le premier affichage
+      (function () {
+        var theme = "dark";
+        try {
+          var pref = localStorage.getItem("hc-livreur-theme") || "dark";
+          var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          theme = pref === "light" || pref === "dark" ? pref : systemDark ? "dark" : "light";
+        } catch (e) {}
+        document.documentElement.setAttribute("data-theme", theme);
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "dark" ? "#0B0908" : "#FFFFFF");
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

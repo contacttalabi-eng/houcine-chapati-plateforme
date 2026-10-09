@@ -1,0 +1,11 @@
+{
+  "name": "Houcine Chapati — Livreur",
+  "short_name": "HC Livreur",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0908",
+  "theme_color": "#0B0908",
+  "icons": [{ "src": "/brand/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
+}

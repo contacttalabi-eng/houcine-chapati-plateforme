@@ -1,0 +1,33 @@
+{
+  "name": "houcine-chapati-plateforme",
+  "private": true,
+  "type": "module",
+  "description": "Houcine Chapati — commandes et livraison (client, administration, livreur) sur Supabase",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev:client": "npm run dev -w @hc/client",
+    "dev:admin": "npm run dev -w @hc/admin",
+    "dev:livreur": "npm run dev -w @hc/livreur",
+    "build": "npm run build -w @hc/client && npm run build -w @hc/admin && npm run build -w @hc/livreur",
+    "typecheck": "tsc -p packages/shared --noEmit && tsc -p apps/client --noEmit && tsc -p apps/admin --noEmit && tsc -p apps/livreur --noEmit",
+    "test": "vitest run",
+    "test:db": "vitest run tests/db",
+    "db:bundle": "node scripts/bundle-sql.mjs",
+    "e2e": "node --env-file=.env scripts/e2e-workflow.mjs",
+    "demo": "node demo/server.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@supabase/supabase-js": "^2.117.3",
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3",
+    "ws": "^8.22.0"
+  }
+}

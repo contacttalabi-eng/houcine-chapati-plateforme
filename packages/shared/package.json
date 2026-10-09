@@ -1,0 +1,27 @@
+{
+  "name": "@hc/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Code partagé : client Supabase, domaine (statuts, prix, téléphone), temps réel, cartes Google Maps, composants UI",
+  "exports": {
+    ".": "./src/index.ts",
+    "./maps": "./src/maps/index.ts",
+    "./theme.css": "./src/styles/theme.css"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "@vis.gl/react-google-maps": "^1.10.1",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "@types/google.maps": "^3.66.5",
+    "@types/leaflet": "^1.9.22",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Houcine Chapati — Commande en ligne",
+  "short_name": "Houcine Chapati",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0908",
+  "theme_color": "#0B0908",
+  "icons": [{ "src": "/brand/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
+}
