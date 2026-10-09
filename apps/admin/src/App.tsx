@@ -29,7 +29,7 @@ export function App() {
           </AdminDataProvider>
         )}
       </StaffGate>
-      <Toaster position="top-right" richColors closeButton />
+      <Toaster position="top-right" richColors closeButton mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)" }} />
     </MapsProvider>
   );
 }

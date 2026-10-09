@@ -81,7 +81,7 @@ export function CartButton({ className }: { className?: string }) {
 /** En-tête des pages secondaires (panier, commande, suivi) : retour, logo, panier. */
 export function TopBar({ back, title }: { back?: string; title?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-nav backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-line bg-nav pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
         {back ? (
           <Link to={back} className="-ml-2 grid size-10 place-items-center rounded-full hover:bg-surface-2" aria-label="Retour">
@@ -105,7 +105,7 @@ export function TopBar({ back, title }: { back?: string; title?: ReactNode }) {
 /** En-tête des onglets (Recherche, Mes commandes, Profil). */
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: ReactNode; action?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-nav backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-line bg-nav pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="mx-auto flex min-h-16 max-w-5xl items-center gap-3 px-4 py-2">
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-extrabold">{title}</h1>

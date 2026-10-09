@@ -72,7 +72,7 @@ export function OrderDetailPage({ ctx, orderId }: { ctx: DriverContext; orderId:
 
   return (
     <div className="mx-auto min-h-dvh max-w-xl pb-44">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-line bg-bg/90 px-3 py-3 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-line bg-bg/90 px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
         <Link to="/" className="grid size-12 place-items-center rounded-full hover:bg-surface-2" aria-label="Retour à mes commandes">
           <ChevronLeft className="size-7" />
         </Link>

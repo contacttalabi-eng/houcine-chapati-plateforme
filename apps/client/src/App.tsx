@@ -37,7 +37,7 @@ function MainNav() {
 
 function ThemedToaster() {
   const { resolved } = useTheme();
-  return <Toaster position="top-center" theme={resolved} richColors closeButton />;
+  return <Toaster position="top-center" theme={resolved} richColors closeButton mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)" }} />;
 }
 
 /** Notifications du client (statut de ses commandes) en temps réel : toast + son + vibration. */

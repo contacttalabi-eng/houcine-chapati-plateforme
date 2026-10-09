@@ -72,7 +72,7 @@ export function Shell({ email, children }: { email: string; children: ReactNode 
       </aside>
 
       <div className="flex min-w-0 flex-col pb-20 lg:pb-0">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-bg/90 px-4 backdrop-blur-md lg:px-8">
+        <header className="sticky top-0 z-20 flex h-[calc(4rem+env(safe-area-inset-top))] items-center gap-3 border-b border-line bg-bg/90 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:px-8">
           <Logo size={36} className="lg:hidden" />
           <p className="font-extrabold lg:hidden">Administration</p>
           <div className="ml-auto flex items-center gap-3">

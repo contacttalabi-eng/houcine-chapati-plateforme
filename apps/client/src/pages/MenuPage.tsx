@@ -10,7 +10,7 @@ import { useMenu } from "../state/menu";
 function HomeHeader() {
   const { settings } = useMenu();
   return (
-    <header className="sticky top-0 z-30 bg-nav backdrop-blur-md">
+    <header className="sticky top-0 z-30 bg-nav pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
         <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand shadow-md shadow-brand/30">
           <Logo size={34} />

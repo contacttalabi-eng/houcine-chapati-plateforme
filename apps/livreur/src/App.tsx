@@ -127,7 +127,7 @@ function DriverApp({ profile, userId, email, provider }: { profile: Profile; use
 
 function ThemedToaster() {
   const { resolved } = useTheme();
-  return <Toaster position="top-center" theme={resolved} richColors closeButton />;
+  return <Toaster position="top-center" theme={resolved} richColors closeButton mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)" }} />;
 }
 
 export function App() {
